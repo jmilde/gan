@@ -18,7 +18,7 @@ def batch(size, path_data, seed=25):
     for i in sample(len(data), seed):
         if size == len(b):
             z = np.random.normal(0, 1, size=(size, len(data[0]))).astype(np.float32)
-            yield [b, z]
+            yield b, z
             b = []
         b.append(data[i])
 

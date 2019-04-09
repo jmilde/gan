@@ -2,4 +2,4 @@
 /trial
 **/__pycache__
 /ckpt
-/cache
+/logs
