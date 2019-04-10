@@ -11,16 +11,17 @@ def pipe(*args, prefetch=1, repeat=-1, name='pipe', **kwargs):
                               .get_next()
 
 
-def batch(size, path_data, seed=25):
+def batch(size, noise_size, path_data, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
     data = np.load(path_data)
     b = []
     for i in sample(len(data), seed):
         if size == len(b):
-            z = np.random.normal(0, 1, size=(size, len(data[0]))).astype(np.float32)
+            z = np.random.normal(0, 1, size=(size, noise_size)).astype(np.float32)
             yield b, z
             b = []
-        b.append(data[i])
+        normalize = (data[i]-127.5)/127.5
+        b.append(normalize)
 
 def placeholder(dtype, shape, x= None, name= None):
     """returns a placeholder with `dtype` and `shape`.
