@@ -20,7 +20,8 @@ def batch(size, noise_size, path_data, seed=25):
             z = np.random.normal(0, 1, size=(size, noise_size)).astype(np.float32)
             yield b, z
             b = []
-        normalize = (data[i]-127.5)/127.5
+        #normalize = (data[i]-127.5)/127.5
+        normalize = data[i]/255
         b.append(normalize)
 
 def placeholder(dtype, shape, x= None, name= None):
@@ -41,3 +42,20 @@ def profile(sess, wrtr, run, feed_dict= None, prerun= 5, tag= 'flow'):
     meta = tf.RunMetadata()
     sess.run(run, feed_dict, tf.RunOptions(trace_level= tf.RunOptions.FULL_TRACE), meta)
     wrtr.add_run_metadata(meta, tag)
+
+
+
+def variable(name, shape, init= 'rand',
+             initializers={'zero': tf.initializers.zeros(),
+                           'unit': tf.initializers.ones(),
+                           'rand': tf.glorot_uniform_initializer()}):
+    """wraps `tf.get_variable` to provide initializer based on usage"""
+    return tf.get_variable(name, shape, initializer= initializers.get(init, init))
+
+
+def normalize(x):
+    dim = x.shape[-1]
+    gain = variable('gain', (1, dim), 'unit')
+    bias = variable('bias', (1, dim), 'zero')
+    mean, var = tf.nn.moments(x, 1, keep_dims= True)
+    return (x - mean) * tf.rsqrt(var + 1e-12) * gain + bias
