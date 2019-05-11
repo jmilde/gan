@@ -16,7 +16,8 @@ def batch3(x, y, size, noise_size, seed=25):
     b, l = [],[]
     for i in sample(len(x), seed):
         if size == len(b):
-            yield b, l
+            z = np.random.normal(size=(size, noise_size))
+            yield b, l, z
             b, l = [], []
         b.append(x[i])
         l.append([y[i]])
@@ -26,7 +27,7 @@ def batch2(x, y, size, noise_size, seed=25):
     b, l = [],[]
     for i in sample(len(x), seed):
         if size == len(b):
-            yield b, l
+            yield b, l, z
             b, l = [], []
         b.append(x[i])
         l.append(y[i])

@@ -25,11 +25,11 @@ data_dim = len(x_train[0])
 
 # data pipeline
 batch_fn = lambda: batch3(x_train, y_train, batch_size, z_dim)
-data = pipe(batch_fn, (tf.float32, tf.float32), prefetch=4)
-z = tf.random_normal((batch_size, z_dim))
+data = pipe(batch_fn, (tf.float32, tf.float32, tf.float32), prefetch=4)
+#z = tf.random_normal((batch_size, z_dim))
 
 # load graph
-model = gan(data, z, btlnk_dim, data_dim, z_dim, dense_dim)
+model = gan(data, btlnk_dim, data_dim, z_dim, dense_dim)
 
 # start session, initialize variables
 sess = tf.InteractiveSession()
@@ -46,7 +46,15 @@ smry = tf.summary.merge([tf.summary.scalar('gnrt_loss', model['g_loss']),
                          tf.summary.scalar('dscr_loss', model['d_loss']),
                          tf.summary.image('img_fake', tf.reshape(model['x_fake'], [-1,28,28,1]), max_outputs=1),
                          tf.summary.image('img_inpt', tf.reshape(model['inpt'], [-1,28,28,1]), max_outputs=1),
-                         tf.summary.image('imgs_fake', tf.reshape(tf.transpose(tf.reshape(model["x_fake"], (30,30,28,28)), (0,2,1,3)), (1,30*28,30*28, 1)))])
+                         tf.summary.image('imgs_fake', tf.reshape(
+                             tf.transpose(
+                                 tf.reshape(
+                                     sess.run(model["x_fake"],
+                                              {model["cond"]:np.random.randint(0,9,(900,1)),
+                                               model["z_inpt"]:np.random.normal(size=(900,z_dim))}),
+                                     (30,30,28,28)),(0,2,1,3)),
+                             (1,30*28,30*28, 1)))])
+
 
 wrtr = tf.summary.FileWriter(pform(path_log, trial))
 wrtr.add_graph(sess.graph)

@@ -16,7 +16,7 @@ path_ckpt = "../ckpt/"
 
 trial = "mnist_wgan_l"
 epochs = 200
-batch_size = 64
+batch_size = 200
 
 z_dim = 64
 dense_dim = [256]
@@ -24,8 +24,9 @@ img_dim = 28*28
 noise = 0.1
 clip_limit = 0.01
 
-d_iter = 5 # train d/g in a n/1 ratio
-d_xiter = 25 # extra iterations every half epoch etc.
+# percentages derived from how others train models (usually diter=5 and d_xiter=25 with batch=64)
+d_iter = max(2,0.005*len(x_train)//batch_size) # train d/g in a n/1 ratio
+d_xiter = (0.025*len(x_train))//batch_size # extra iterations every half epoch etc.
 
 
 # data pipeline
@@ -68,7 +69,7 @@ for epoch in tqdm(range(epochs)): #
     for i in range(bpe):
 
         #if wgan no diminishing gradient problem -> train D more for better start
-        extra_iter = d_xiter if (i<(bpe*0.03) and epoch==0) or (i==bpe//2) else d_iter
+        extra_iter = d_xiter if (i<(bpe*0.025) and epoch==0) or (i==bpe//2) else d_iter
         for __ in range(extra_iter):
             sess.run(model['d_step'])
             sess.run(model["d_clip"])

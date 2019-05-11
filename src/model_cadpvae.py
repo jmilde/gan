@@ -2,7 +2,7 @@ from util_tf import tf, placeholder, normalize
 from util_np import np
 
 
-def gan(data, z, btlnk_dim, data_dim, z_dim, dense_dim):
+def gan(data, btlnk_dim, data_dim, z_dim, dense_dim):
 
     def generator(x, cond, btlnk_dim, dense_dim, data_dim):
         x = tf.layers.dense(x, data_dim, use_bias=False)
@@ -33,11 +33,11 @@ def gan(data, z, btlnk_dim, data_dim, z_dim, dense_dim):
         return logits
 
     with tf.variable_scope("Input"):
-        inpt = placeholder(tf.float32, [None, data_dim], data[0], "Input")
-    with tf.variable_scope("Conditional"):y
-        cond = placeholder(tf.float32, [None, 1], data[1], "Conditional")
+        inpt = placeholder(tf.float32, [None, data_dim], data[0], "input")
+    with tf.variable_scope("Conditional"):
+        cond = placeholder(tf.float32, [None, 1], data[1], "conditional")
     with tf.variable_scope("Noise"):
-        z_inpt = placeholder(tf.float32, [None, z_dim], z, "Noise")
+        z_inpt = placeholder(tf.float32, [None, z_dim], data[2], "noise")
 
     with tf.variable_scope("generator"):
         x_fake = generator(z_inpt, cond, btlnk_dim, dense_dim, data_dim)
@@ -68,7 +68,7 @@ def gan(data, z, btlnk_dim, data_dim, z_dim, dense_dim):
     g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
     d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
 
-    with tf.variable_scope("Optimizer"):
+    with tf.variable_scope("optimizer"):
         optimizer = tf.train.AdamOptimizer()
 
     with tf.variable_scope("train_step"):
@@ -78,6 +78,7 @@ def gan(data, z, btlnk_dim, data_dim, z_dim, dense_dim):
 
     return dict(step=step,
                 inpt=inpt,
+                cond=cond,
                 d_loss=d_loss,
                 g_loss=g_loss,
                 d_step=d_step,
