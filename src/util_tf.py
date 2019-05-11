@@ -11,14 +11,33 @@ def pipe(*args, prefetch=1, repeat=-1, name='pipe', **kwargs):
                               .get_next()
 
 
+def batch3(x, y, size, noise_size, seed=25):
+    """batch function to use with pipe, takes to numpy labels as input"""
+    b, l = [],[]
+    for i in sample(len(x), seed):
+        if size == len(b):
+            yield b, l
+            b, l = [], []
+        b.append(x[i])
+        l.append([y[i]])
+
+def batch2(x, y, size, noise_size, seed=25):
+    """batch function to use with pipe, takes to numpy labels as input"""
+    b, l = [],[]
+    for i in sample(len(x), seed):
+        if size == len(b):
+            yield b, l
+            b, l = [], []
+        b.append(x[i])
+        l.append(y[i])
+
 def batch(size, noise_size, path_data, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
     data = np.load(path_data)
     b = []
     for i in sample(len(data), seed):
         if size == len(b):
-            z = np.random.normal(0, 1, size=(size, noise_size)).astype(np.float32)
-            yield b, z
+            yield b
             b = []
         #normalize = (data[i]-127.5)/127.5
         normalize = data[i]/255
@@ -53,9 +72,10 @@ def variable(name, shape, init= 'rand',
     return tf.get_variable(name, shape, initializer= initializers.get(init, init))
 
 
-def normalize(x):
-    dim = x.shape[-1]
-    gain = variable('gain', (1, dim), 'unit')
-    bias = variable('bias', (1, dim), 'zero')
-    mean, var = tf.nn.moments(x, 1, keep_dims= True)
-    return (x - mean) * tf.rsqrt(var + 1e-12) * gain + bias
+def normalize(x, name="layer_norm"):
+    with tf.variable_scope(name):
+        dim = x.shape[-1]
+        gain = variable('gain', (1, dim), 'unit')
+        bias = variable('bias', (1, dim), 'zero')
+        mean, var = tf.nn.moments(x, 1, keep_dims= True)
+        return (x - mean) * tf.rsqrt(var + 1e-12) * gain + bias
