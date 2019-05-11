@@ -15,9 +15,8 @@ def gan(data, btlnk_dim, data_dim, z_dim, dense_dim):
         x = normalize(tf.layers.dense(x, btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu), "layer_norm_2")
         # output
         logits = tf.layers.dense(x, data_dim, use_bias=False)
-        return logits
+        return tf.nn.sigmoid(logits)
         #return tf.clip_by_value(x, 0.0, 1.0)
-
 
 
     def discriminator(x, cond, btlnk_dim, dense_dim, data_dim):
@@ -30,7 +29,9 @@ def gan(data, btlnk_dim, data_dim, z_dim, dense_dim):
         # bottleneck
         x = normalize(tf.layers.dense(x, btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu),"layer_norm_2")
         logits = tf.layers.dense(x, data_dim, use_bias=False)
-        return logits
+        return tf.nn.sigmoid(logits)
+
+
 
     with tf.variable_scope("Input"):
         inpt = placeholder(tf.float32, [None, data_dim], data[0], "input")
@@ -51,17 +52,21 @@ def gan(data, btlnk_dim, data_dim, z_dim, dense_dim):
 
     with tf.variable_scope("loss"):
         with tf.variable_scope("d_loss"):
-            d_loss_real = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(labels=inpt, logits=y_real))
-            d_loss_fake = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(labels=x_fake, logits=y_fake))
+            d_loss_real = tf.reduce_mean(tf.losses.absolute_difference(inpt,y_real))
+            d_loss_fake = tf.reduce_mean(tf.losses.absolute_difference(x_fake, y_fake))
+            #d_loss_real = tf.reduce_mean(
+            #    tf.nn.softmax_cross_entropy_with_logits_v2(labels=inpt, logits=y_real))
+            #d_loss_fake = tf.reduce_mean(
+            #    tf.nn.softmax_cross_entropy_with_logits_v2(labels=x_fake, logits=y_fake))
             d_loss = d_loss_real - d_loss_fake
 
         with tf.variable_scope("g_loss"):
-            g_loss_g = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(labels=inpt, logits=x_fake))
-            g_loss_d = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(labels=x_fake, logits=y_fake))
+            g_loss_g = tf.reduce_mean(tf.losses.absolute_difference(inpt, x_fake))
+            g_loss_d = tf.reduce_mean(tf.losses.absolute_difference(x_fake, y_fake))
+            #g_loss_g = tf.reduce_mean(
+            #    tf.nn.softmax_cross_entropy_with_logits_v2(labels=inpt, logits=x_fake))
+            #g_loss_d = tf.reduce_mean(
+            #    tf.nn.softmax_cross_entropy_with_logits_v2(labels=x_fake, logits=y_fake))
             g_loss = g_loss_g + g_loss_d
 
 
@@ -85,4 +90,5 @@ def gan(data, btlnk_dim, data_dim, z_dim, dense_dim):
                 g_step=g_step,
                 x_fake=x_fake,
                 z_inpt=z_inpt,
+                y_fake=y_fake,
                 y_real=y_real)
