@@ -11,7 +11,7 @@ def pipe(*args, prefetch=1, repeat=-1, name='pipe', **kwargs):
                               .get_next()
 
 
-def batch3(x, y, size, noise_size, seed=25):
+def batch3(x, y, size, oh_size, noise_size, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
     b, l = [],[]
     for i in sample(len(x), seed):
@@ -20,14 +20,16 @@ def batch3(x, y, size, noise_size, seed=25):
             yield b, l, z
             b, l = [], []
         b.append(x[i])
-        l.append([y[i]])
+        oh = np.zeros((oh_size))
+        oh[y[i]]=1
+        l.append(oh)
 
 def batch2(x, y, size, noise_size, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
     b, l = [],[]
     for i in sample(len(x), seed):
         if size == len(b):
-            yield b, l, z
+            yield b, l
             b, l = [], []
         b.append(x[i])
         l.append(y[i])

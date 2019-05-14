@@ -11,29 +11,33 @@ test_size = 900
 x_train = np.reshape(np.concatenate([train_images, test_images[test_size:]]), (70000-test_size, 28*28))/255
 y_train = np.concatenate([train_labels, test_labels[test_size:]])
 x_test = np.reshape(test_images[:test_size],(test_size,28*28))/255
-y_test= np.reshape(test_labels[:test_size],(test_size,1))
+y_test= test_labels[:test_size]
+oh = np.zeros((test_size,len(set(y_train))))
+oh[np.arange(test_size), y_test]=1
+y_test= oh
 
 path_log = "../logs/"
 path_ckpt = "../ckpt/"
 
 
-trial = "mnist_cadpvae3"
+trial = "mnist_cadae_sigm-32"
 epochs = 200
 batch_size = 500
 
 z_dim = 64
 dense_dim = [64] # add numbers to create more layers, g and d are symatrical
-btlnk_dim = 4
+btlnk_dim = 32
+cond_dim = len(set(y_train))
 data_dim = len(x_train[0])
 
 rand = RandomState(0) #fix seed
 # data pipeline
-batch_fn = lambda: batch3(x_train, y_train, batch_size, z_dim)
+batch_fn = lambda: batch3(x_train, y_train, batch_size, cond_dim, z_dim)
 data = pipe(batch_fn, (tf.float32, tf.float32, tf.float32), prefetch=4)
 #z = tf.random_normal((batch_size, z_dim))
 
 # load graph
-model = gan(data, btlnk_dim, data_dim, z_dim, dense_dim)
+model = gan(data, btlnk_dim, data_dim, cond_dim, z_dim, dense_dim)
 
 # start session, initialize variables
 sess = tf.InteractiveSession()
@@ -71,6 +75,7 @@ for epoch in tqdm(range(epochs)):
     # tensorboard writer
     step = sess.run(model['step'])
     wrtr.add_summary(sess.run(smry, {model["inpt"]:x_test,
-                                     model["cond"]:y_test,
-                                     model["z_inpt"]:rand.normal(size=(900,z_dim),)}), step)
+                                     model["cond"]:y_test}), step)
+                                     #model["z_inpt"]:rand.normal(size=(900,z_dim),)}), step)
     wrtr.flush()
+saver.save(sess, pform(path_ckpt, trial), write_meta_graph=False)

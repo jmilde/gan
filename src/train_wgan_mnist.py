@@ -14,7 +14,7 @@ path_log = "../logs/"
 path_ckpt = "../ckpt/"
 
 
-trial = "mnist_wgan_l"
+trial = "mnist_wgan_sigm"
 epochs = 200
 batch_size = 200
 
@@ -26,7 +26,7 @@ clip_limit = 0.01
 
 # percentages derived from how others train models (usually diter=5 and d_xiter=25 with batch=64)
 d_iter = max(2,0.005*len(x_train)//batch_size) # train d/g in a n/1 ratio
-d_xiter = (0.025*len(x_train))//batch_size # extra iterations every half epoch etc.
+d_xiter = int((0.025*len(x_train))//batch_size) # extra iterations every half epoch etc.
 
 
 # data pipeline
@@ -64,7 +64,6 @@ wrtr.add_graph(sess.graph)
 #wrtr.flush()
 
 bpe = len(x_train)//batch_size # batch per epoch
-print(bpe)
 for epoch in tqdm(range(epochs)): #
     for i in range(bpe):
 
