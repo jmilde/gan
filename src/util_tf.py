@@ -1,5 +1,5 @@
 import tensorflow as tf
-from util_np import np, sample
+from src.util_np import np, sample
 
 def pipe(*args, prefetch=1, repeat=-1, name='pipe', **kwargs):
     """see `tf.data.Dataset.from_generator`."""
