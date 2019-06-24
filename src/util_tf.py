@@ -1,5 +1,9 @@
 import tensorflow as tf
-from src.util_np import np, sample
+try:
+    from src.util_np import np, sample, batch_sample
+except ImportError:
+    from util_np import np, batch_sample, sample
+
 
 def pipe(*args, prefetch=1, repeat=-1, name='pipe', **kwargs):
     """see `tf.data.Dataset.from_generator`."""
@@ -24,15 +28,14 @@ def batch3(x, y, size, oh_size, noise_size, seed=25):
         oh[y[i]]=1
         l.append(oh)
 
-def batch2(x, y, size, noise_size, seed=25):
+def batch2(x, y, size, noise_size=0, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
-    b, l = [],[]
-    for i in sample(len(x), seed):
-        if size == len(b):
-            yield b, l
-            b, l = [], []
-        b.append(x[i])
-        l.append(y[i])
+    for i in batch_sample(len(x), size):
+        if noise_size==0:
+            yield x[i], y[i]
+        else:
+            yield x[i], y[i], np.random.normal(size=(size, noise_size))
+
 
 def batch(size, noise_size, path_data, seed=25):
     """batch function to use with pipe, takes to numpy labels as input"""
