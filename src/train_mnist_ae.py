@@ -10,15 +10,16 @@ except ImportError:
     from models.ae import ae
 from tqdm import tqdm
 from numpy.random import RandomState
+import os
 
-
-def train():
+def train(anomaly_class):
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     #load data
-    anomaly_class = 8
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
     inlier = train_images[train_labels!=anomaly_class]
     x_train = np.reshape(inlier, (len(inlier), 28*28))/255
-    y_train = train_labels[train_labels!=anomaly_class]
+    #y_train = train_labels[train_labels!=anomaly_class]
+    y_train = np.zeros(len(x_train))
     outlier = train_images[train_labels==anomaly_class]
     x_test = np.reshape(np.concatenate([outlier, test_images])
                         ,(len(outlier)+len(test_images), 28*28))/255
@@ -35,7 +36,8 @@ def train():
     btlnk_dim = 32
     y_dim = 1
     data_dim = len(x_train[0])
-    trial = f"{anomaly_class}dae_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}"
+    loss_type = "l1 "#"xntropy"
+    trial = f"{anomaly_class}dae_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}_{loss_type}"
 
 
     rand = RandomState(0) #fix seed
@@ -45,7 +47,7 @@ def train():
     #z = tf.random_normal((batch_size, z_dim))
 
     # load graph
-    model = ae(data, btlnk_dim, data_dim, dense_dim, y_dim)
+    model = ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type)
 
     # start session, initialize variables
     sess = tf.InteractiveSession()
@@ -69,12 +71,12 @@ def train():
             , wrtr= wrtr
             , log = tf.summary.merge([tf.summary.scalar('loss', model['loss'])
                                       , tf.summary.image('img', tf.reshape(model['logits'], [-1,28,28,1]), max_outputs=1)
-                                      #, tf.summary.image('dx900', tf.reshape(
-                                      #    tf.transpose(tf.reshape(model["dx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
+                                      , tf.summary.image('imgs', tf.reshape(
+                                          tf.transpose(tf.reshape(model["logits"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
                                       , tf.summary.scalar("AUC", model["auc"])])
             , y= y_test
             , x= x_test):
-        wrtr.add_summary(sess.run(log), step)
+        wrtr.add_summary(sess.run(log, {model["x"]:x_test, model["y"]:y_test}), step)
         wrtr.flush()
 
 
@@ -89,4 +91,5 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    for i in range(0,10):
+        train(i)
