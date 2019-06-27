@@ -13,7 +13,7 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim):
 
     def decoder(x, data_dim):
         x = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        return x
+        return tf.clip_by_value(x, 0.0, 1.0)
 
     with tf.variable_scope("x"):
         x = placeholder(tf.float32, [None, data_dim], data[0], "x")
@@ -33,7 +33,7 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim):
 
     with tf.variable_scope("AUC"):
         anomaly_score = tf.reduce_mean((x-logits)**2, axis=1)
-        auc, _ = tf.metrics.auc(y, anomaly_score)
+        _, auc_score = tf.metrics.auc(y, anomaly_score)
 
     with tf.variable_scope("train_step"):
         train_step = tf.train.AdamOptimizer().minimize(loss, step)
@@ -43,6 +43,6 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim):
                 x=x,
                 y=y,
                 logits=logits,
-                auc=auc,
+                auc_score=auc_score,
                 train_step=train_step,
                 loss=loss)

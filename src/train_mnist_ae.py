@@ -13,12 +13,14 @@ from numpy.random import RandomState
 
 
 def train():
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     #load data
     anomaly_class = 8
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
     inlier = train_images[train_labels!=anomaly_class]
     x_train = np.reshape(inlier, (len(inlier), 28*28))/255
-    y_train = train_labels[train_labels!=anomaly_class]
+    #y_train = train_labels[train_labels!=anomaly_class]
+    y_train = np.zeros(len(x_train), dtype=np.int8)
     outlier = train_images[train_labels==anomaly_class]
     x_test = np.reshape(np.concatenate([outlier, test_images])
                         ,(len(outlier)+len(test_images), 28*28))/255
@@ -27,6 +29,7 @@ def train():
     x_test, y_test = unison_shfl(x_test, np.array(y_test))
     path_log = "/cache/tensorboard-logdir/ae"
     path_ckpt = "/project/outlier_detection/ckpt"
+
 
     epochs = 200
     batch_size = 64
@@ -55,14 +58,13 @@ def train():
     wrtr = tf.summary.FileWriter(pform(path_log, trial))
     #wrtr.add_graph(sess.graph)
 
-    # tensorboard summary
-    auc = placeholder(tf.float32, (), name="AUC")
 
     ### if load pretrained model
     # pretrain = "modelname"
     #saver.restore(sess, pform(path_ckpt, pretrain))
     ### else:
-    init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+    auc_vars = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope='AUC')
+    init = tf.group(tf.global_variables_initializer(), tf.variables_initializer(var_list=running_vars_auc))
     sess.run(init)
 
     def log(step
@@ -71,7 +73,7 @@ def train():
                                       , tf.summary.image('img', tf.reshape(model['logits'], [-1,28,28,1]), max_outputs=1)
                                       #, tf.summary.image('dx900', tf.reshape(
                                       #    tf.transpose(tf.reshape(model["dx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
-                                      , tf.summary.scalar("AUC", model["auc"])])
+                                      , tf.summary.scalar("AUC", model["auc_score"])])
             , y= y_test
             , x= x_test):
         wrtr.add_summary(sess.run(log), step)
