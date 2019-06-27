@@ -8,9 +8,9 @@ except ImportError:
     from util_io import pform
     from util_np import np, unison_shfl
     from mnist_model_dae import gan
-
 from tqdm import tqdm
 from numpy.random import RandomState
+
 
 def train():
     #load data
@@ -25,17 +25,18 @@ def train():
     y_test= np.concatenate([train_labels[train_labels==anomaly_class], test_labels])
     y_test = [0 if y!=anomaly_class else 1 for y in y_test]
     x_test, y_test = unison_shfl(x_test, np.array(y_test))
-    path_log = "./logs/"
-    path_ckpt = "./ckpt/"
+    path_log = "/cache/tensorboard-logdir/ae"
+    path_ckpt = "/project/outlier_detection/ckpt"
 
     epochs = 200
     batch_size = 64
 
-    dense_dim = 64 # add numbers to create more layers, g and d are symatrical
+    dense_dim = 64
     btlnk_dim = 32
     y_dim = 1
     data_dim = len(x_train[0])
-    trial = f"mnist_dae_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}"
+    trial = f"{anomaly_class}dae_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}"
+
 
     rand = RandomState(0) #fix seed
     # data pipeline
