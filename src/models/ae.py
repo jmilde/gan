@@ -45,6 +45,6 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type):
                 x=x,
                 y=y,
                 logits=logits,
-                auc=auc,
+                auc_score=auc_score,
                 train_step=train_step,
                 loss=loss)
