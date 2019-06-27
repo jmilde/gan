@@ -70,9 +70,9 @@ def train(anomaly_class = 8):
             , log = tf.summary.merge([tf.summary.scalar('g_loss', model['g_loss'])
                                       , tf.summary.scalar('d_loss', model['d_loss'])
                                       , tf.summary.image('gz900', tf.reshape(
-                                          tf.transpose(tf.reshape(model["gz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1))),
+                                          tf.transpose(tf.reshape(model["gz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
                                       , tf.summary.image('dgz900', tf.reshape(
-                                          tf.transpose(tf.reshape(model["dgz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1))),
+                                          tf.transpose(tf.reshape(model["dgz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
                                       , tf.summary.image('dx900', tf.reshape(
                                           tf.transpose(tf.reshape(model["dx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
                                       , tf.summary.image('gz', tf.reshape(model['gz'], [-1,28,28,1]), max_outputs=1)

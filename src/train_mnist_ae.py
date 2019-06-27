@@ -65,7 +65,7 @@ def train(anomaly_class):
     #saver.restore(sess, pform(path_ckpt, pretrain))
     ### else:
     auc_vars = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope='AUC')
-    init = tf.group(tf.global_variables_initializer(), tf.variables_initializer(var_list=running_vars_auc))
+    init = tf.group(tf.global_variables_initializer(), tf.variables_initializer(var_list=auc_vars))
     sess.run(init)
 
     def log(step
