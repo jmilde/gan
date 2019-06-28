@@ -7,12 +7,13 @@ except ImportError:
 
 def dae(data, btlnk_dim, data_dim, y_dim):
     def generator(x, btlnk_dim, data_dim):
-        x = normalize(tf.nn.relu(tf.keras.layers.Dense(btlnk_dim, use_bias=False)(x)), "layer_norm_1")
+        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu)(x), "layer_norm_1")
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        return tf.clip_by_value(logits, 0.0, 1.0)
+        return tf.nn.sigmoid(logits)
+        #return tf.clip_by_value(logits, 0.0, 1.0)
 
     def discriminator(x, btlnk_dim, data_dim):
-        x = normalize(tf.nn.relu(tf.keras.layers.Dense(btlnk_dim, use_bias=False)(x)), "layer_norm_1")
+        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu)(x), "layer_norm_1")
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
         return tf.clip_by_value(logits, 0.0, 1.0)
 
@@ -31,8 +32,6 @@ def dae(data, btlnk_dim, data_dim, y_dim):
     with tf.variable_scope(scope,reuse=True):
         dgz = discriminator(gz, btlnk_dim, data_dim)
 
-    step = tf.train.get_or_create_global_step()
-
     with tf.variable_scope("loss"):
         a = tf.reduce_mean(tf.abs(x - dx))
         b = tf.reduce_mean(tf.abs(gz - dgz))
@@ -45,6 +44,7 @@ def dae(data, btlnk_dim, data_dim, y_dim):
         anomaly_score = tf.reduce_mean((x-dgz)**2, axis=1)
         _, auc = tf.metrics.auc(y, anomaly_score)
 
+    step = tf.train.get_or_create_global_step()
 
     with tf.variable_scope("optimizer"):
         optimizer = tf.train.AdamOptimizer()
