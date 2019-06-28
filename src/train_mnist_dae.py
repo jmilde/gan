@@ -31,12 +31,11 @@ def train(anomaly_class = 8):
     path_ckpt = "/project/outlier_detection/ckpt"
 
     epochs = 200
-    batch_size = 64
+    batch_size = 500
 
-    dense_dim = 64
     btlnk_dim = 32
     y_dim = 1
-    trial = f"dae{anomaly_class}_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}"
+    trial = f"dae{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}"
 
     data_dim = len(x_train[0])
 
@@ -70,14 +69,14 @@ def train(anomaly_class = 8):
             , wrtr= wrtr
             , log = tf.summary.merge([tf.summary.scalar('g_loss', model['g_loss'])
                                       , tf.summary.scalar('d_loss', model['d_loss'])
-                                      , tf.summary.image('gz900', tf.reshape(
-                                          tf.transpose(tf.reshape(model["gz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
-                                      , tf.summary.image('dgz900', tf.reshape(
-                                          tf.transpose(tf.reshape(model["dgz"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
+                                      , tf.summary.image('gx900', tf.reshape(
+                                          tf.transpose(tf.reshape(model["gx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
+                                      , tf.summary.image('dgx900', tf.reshape(
+                                          tf.transpose(tf.reshape(model["dgx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
                                       , tf.summary.image('dx900', tf.reshape(
                                           tf.transpose(tf.reshape(model["dx"][:900],(30,30,28,28)),(0,2,1,3)),(1,30*28,30*28, 1)))
-                                      , tf.summary.image('gz', tf.reshape(model['gz'], [-1,28,28,1]), max_outputs=1)
-                                      , tf.summary.image('dgz', tf.reshape(model['dgz'], [-1,28,28,1]), max_outputs=1)
+                                      , tf.summary.image('gx', tf.reshape(model['gx'], [-1,28,28,1]), max_outputs=1)
+                                      , tf.summary.image('dgx', tf.reshape(model['dgx'], [-1,28,28,1]), max_outputs=1)
                                       , tf.summary.image('dx', tf.reshape(model['dx'], [-1,28,28,1]), max_outputs=1)
                                       , tf.summary.scalar("AUC", model["auc"])])
             , y= y_test

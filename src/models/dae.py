@@ -7,10 +7,9 @@ except ImportError:
 
 def dae(data, btlnk_dim, data_dim, y_dim):
     def generator(x, btlnk_dim, data_dim):
-        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu)(x), "layer_norm_1")
+        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x), "layer_norm_1")
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        return tf.nn.sigmoid(logits)
-        #return tf.clip_by_value(logits, 0.0, 1.0)
+        return tf.clip_by_value(logits, 0.0, 1.0)
 
     def discriminator(x, btlnk_dim, data_dim):
         x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu)(x), "layer_norm_1")
@@ -25,23 +24,23 @@ def dae(data, btlnk_dim, data_dim, y_dim):
         y = placeholder(tf.float32, [None], data[1], "y")
 
     with tf.variable_scope("generator"):
-        gz = generator(x, btlnk_dim, data_dim)
+        gx = generator(x, btlnk_dim, data_dim)
 
     with tf.variable_scope("discriminator") as scope:
         dx = discriminator(x, btlnk_dim, data_dim)
     with tf.variable_scope(scope,reuse=True):
-        dgz = discriminator(gz, btlnk_dim, data_dim)
+        dgx = discriminator(gx, btlnk_dim, data_dim)
 
     with tf.variable_scope("loss"):
         a = tf.reduce_mean(tf.abs(x - dx))
-        b = tf.reduce_mean(tf.abs(gz - dgz))
-        c =  tf.reduce_mean(tf.abs(x - gz))
+        b = tf.reduce_mean(tf.abs(gx - dgx))
+        c =  tf.reduce_mean(tf.abs(x - gx))
         d_loss = a - b
         g_loss = b + c
         loss = a - b - c
 
     with tf.variable_scope("AUC"):
-        anomaly_score = tf.reduce_mean((x-dgz)**2, axis=1)
+        anomaly_score = tf.reduce_mean((x-dgx)**2, axis=1)
         _, auc = tf.metrics.auc(y, anomaly_score)
 
     step = tf.train.get_or_create_global_step()
@@ -51,7 +50,7 @@ def dae(data, btlnk_dim, data_dim, y_dim):
 
     with tf.variable_scope("train_step"):
         train_step = optimizer.apply_gradients(
-            [((- grad if var.name.startswith("generator/") else grad), var)
+            [((- grad if var.name.startswith("generator") else grad), var)
              for grad, var in optimizer.compute_gradients(loss)], step)
 
 
@@ -59,8 +58,8 @@ def dae(data, btlnk_dim, data_dim, y_dim):
     return dict(step=step,
                 x=x,
                 y=y,
-                gz=gz,
-                dgz=dgz,
+                gx=gx,
+                dgx=dgx,
                 dx=dx,
                 auc=auc,
                 train_step=train_step,
