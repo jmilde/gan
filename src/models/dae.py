@@ -9,13 +9,14 @@ def dae(data, btlnk_dim, data_dim, y_dim):
     def generator(x, btlnk_dim, data_dim):
         x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x), "layer_norm_1")
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
+        #return tf.nn.sigmoid(logits)
         return tf.clip_by_value(logits, 0.0, 1.0)
 
     def discriminator(x, btlnk_dim, data_dim):
-        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.leaky_relu)(x), "layer_norm_1")
+        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x), "layer_norm_1")
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
         return tf.clip_by_value(logits, 0.0, 1.0)
-
+        #return tf.nn.sigmoid(logits)
 
 
     with tf.variable_scope("x"):
@@ -26,9 +27,9 @@ def dae(data, btlnk_dim, data_dim, y_dim):
     with tf.variable_scope("generator"):
         gx = generator(x, btlnk_dim, data_dim)
 
-    with tf.variable_scope("discriminator") as scope:
+    with tf.variable_scope("discriminator"):
         dx = discriminator(x, btlnk_dim, data_dim)
-    with tf.variable_scope(scope,reuse=True):
+    with tf.variable_scope("discriminator", reuse=True):
         dgx = discriminator(gx, btlnk_dim, data_dim)
 
     with tf.variable_scope("loss"):

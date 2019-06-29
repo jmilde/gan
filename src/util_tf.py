@@ -85,3 +85,11 @@ def normalize(x, name="layer_norm"):
         bias = variable('bias', (1, dim), 'zero')
         mean, var = tf.nn.moments(x, 1, keep_dims= True)
         return (x - mean) * tf.rsqrt(var + 1e-12) * gain + bias
+
+
+def spread_image(x, nrow, ncol, height, width):
+    return tf.reshape(
+        tf.transpose(
+            tf.reshape(x, (nrow, ncol, height, width, -1))
+            , (0, 2, 1, 3, 4))
+        , (1, nrow * height, ncol * width, -1))
