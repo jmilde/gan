@@ -1,10 +1,10 @@
 try:
-    from src.util_tf import tf, pipe, batch2, placeholder, profile
+    from src.util_tf import tf, pipe, batch2, placeholder, profile, spread_image
     from src.util_io import pform
     from src.util_np import np, unison_shfl
     from src.models.aegan import gan
 except ImportError:
-    from util_tf import tf, pipe, batch2, placeholder, profile
+    from util_tf import tf, pipe, batch2, placeholder, profile, spread_image
     from util_io import pform
     from util_np import np, unison_shfl
     from models.aegan import gan
@@ -13,7 +13,7 @@ from numpy.random import RandomState
 import os
 
 def train(anomaly_class = 8):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
     inlier = train_images[train_labels!=anomaly_class]
@@ -33,12 +33,11 @@ def train(anomaly_class = 8):
     epochs = 200
     batch_size = 64
 
-    dense_dim = [64, 64]
+    dense_dim = [128, 128]
     btlnk_dim = 32
-    z_dim = 64
     y_dim = 1
     context_weight = 1
-    trial = f"aegan{anomaly_class}_b{batch_size}_d{dense_dim}_bltnk{btlnk_dim}_cw{context_weight}"
+    trial = f"aegansig{anomaly_class}_b{batch_size}_d{dense_dim}_bltnk{btlnk_dim}_cw{context_weight}"
 
     data_dim = len(x_train[0])
 
@@ -70,27 +69,22 @@ def train(anomaly_class = 8):
             , wrtr= wrtr
             , log = tf.summary.merge([tf.summary.scalar('g_loss', model['g_loss'])
                                       , tf.summary.scalar('d_loss', model['d_loss'])
-                                      , tf.summary.image('imgs', tf.reshape(
-                                          tf.transpose(
-                                              tf.reshape(
-                                                  model["gx"][:900]
-                                                  ,(30,30,28,28))
-                                              ,(0,2,1,3))
-                                          ,(1,30*28,30*28, 1)))
-                                      , tf.summary.scalar("AUC", model["auc"])])
+                                      , tf.summary.image('gx400', spread_image(model["gx"][:400], 20,20,28,28))
+                                      , tf.summary.scalar("AUC", model["auc"])
+                                      , tf.summary.scalar("AUC_d", model["auc_d"])])
             , y= y_test
             , x= x_test):
-        wrtr.add_summary(sess.run(log, {model["x"]:x_test
-                                        , model["y"]:y_test})
+        wrtr.add_summary(sess.run(log, {model["x"]:x
+                                        , model["y"]:y})
                          , step)
         wrtr.flush()
 
 
     for epoch in tqdm(range(epochs)):
         for i in range(len(x_train)//batch_size):
-            sess.run(model["train_step"])
-            #sess.run(model['d_step'])
-            #sess.run(model['g_step'])
+            #sess.run(model["train_step"])
+            sess.run(model['d_step'])
+            sess.run(model['g_step'])
         # tensorboard writer
         log(sess.run(model["step"]))
 

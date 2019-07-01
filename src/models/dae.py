@@ -1,21 +1,25 @@
 try:
-    from util_tf import tf, placeholder, normalize
+    from util_tf import tf, placeholder, normalize, Linear, Normalize
     from util_np import np
 except ImportError:
-    from src.util_tf import tf, placeholder, normalize
+    from src.util_tf import tf, placeholder, normalize, Linear, Normalize
     from src.util_np import np
 
-def dae(data, btlnk_dim, data_dim, y_dim):
+def dae(data, btlnk_dim, data_dim):
     def generator(x, btlnk_dim, data_dim):
-        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x), "layer_norm_1")
+        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x))
         logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
         #return tf.nn.sigmoid(logits)
         return tf.clip_by_value(logits, 0.0, 1.0)
 
     def discriminator(x, btlnk_dim, data_dim):
-        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x), "layer_norm_1")
-        logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        return tf.clip_by_value(logits, 0.0, 1.0)
+        lin = Linear(btlnk_dim, data_dim, name= 'lin')
+        nrm = Normalize(    btlnk_dim, name= 'nrm')
+        lex = Linear(data_dim, btlnk_dim, name= 'lex')
+        return tf.clip_by_value(lex(nrm(tf.nn.relu(lin(x)))), 0.0, 1.0)
+        #x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu, name="layer1")(x), "norm")
+        #logits = tf.keras.layers.Dense(data_dim, use_bias=False, name="layer2")(x)
+        #return tf.clip_by_value(logits, 0.0, 1.0)
         #return tf.nn.sigmoid(logits)
 
 
@@ -27,9 +31,9 @@ def dae(data, btlnk_dim, data_dim, y_dim):
     with tf.variable_scope("generator"):
         gx = generator(x, btlnk_dim, data_dim)
 
-    with tf.variable_scope("discriminator"):
+    with tf.variable_scope("discriminator", reuse= tf.AUTO_REUSE):
+
         dx = discriminator(x, btlnk_dim, data_dim)
-    with tf.variable_scope("discriminator", reuse=True):
         dgx = discriminator(gx, btlnk_dim, data_dim)
 
     with tf.variable_scope("loss"):
