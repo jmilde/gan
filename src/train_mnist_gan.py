@@ -98,4 +98,5 @@ def train(anomaly_class = 8):
 
 
 if __name__ == "__main__":
-    train()
+    for i in range(0,10):
+        train(i)
