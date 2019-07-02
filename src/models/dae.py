@@ -1,72 +1,84 @@
 try:
-    from util_tf import tf, placeholder, normalize, Linear, Normalize
-    from util_np import np
+    from util import Record, identity, comp, partial
+    from util_tf import tf, scope, variable, placeholder, Linear, Affine, Normalize, spread_image
 except ImportError:
-    from src.util_tf import tf, placeholder, normalize, Linear, Normalize
-    from src.util_np import np
+    from src.util import Record, identity, comp, partial
+    from src.util_tf import tf, scope, variable, placeholder, Linear, Affine, Normalize, spread_image
 
-def dae(data, btlnk_dim, data_dim):
-    def generator(x, btlnk_dim, data_dim):
-        x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu)(x))
-        logits = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        #return tf.nn.sigmoid(logits)
-        return tf.clip_by_value(logits, 0.0, 1.0)
+class Gen(Record):
 
-    def discriminator(x, btlnk_dim, data_dim):
-        lin = Linear(btlnk_dim, data_dim, name= 'lin')
-        nrm = Normalize(    btlnk_dim, name= 'nrm')
-        lex = Linear(data_dim, btlnk_dim, name= 'lex')
-        return tf.clip_by_value(lex(nrm(tf.nn.relu(lin(x)))), 0.0, 1.0)
-        #x = normalize(tf.keras.layers.Dense(btlnk_dim, use_bias=False, activation=tf.nn.relu, name="layer1")(x), "norm")
-        #logits = tf.keras.layers.Dense(data_dim, use_bias=False, name="layer2")(x)
-        #return tf.clip_by_value(logits, 0.0, 1.0)
-        #return tf.nn.sigmoid(logits)
+    def __init__(self, dim_x, dim_btlnk, name= 'generator'):
+        self.name = name
+        with scope(name):
+            self.lin = Linear(dim_btlnk, dim_x, name= 'lin')
+            self.nrm = Normalize(    dim_btlnk, name= 'nrm')
+            self.lex = Linear(dim_x, dim_btlnk, name= 'lex')
+
+    def __call__(self, x, name= None):
+        with scope(name or self.name):
+            return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
 
 
-    with tf.variable_scope("x"):
-        x = placeholder(tf.float32, [None, data_dim], data[0], "x")
-    with tf.variable_scope("y"):
-        y = placeholder(tf.float32, [None], data[1], "y")
+class Dis(Record):
 
-    with tf.variable_scope("generator"):
-        gx = generator(x, btlnk_dim, data_dim)
+    def __init__(self, dim_x, dim_btlnk, name= 'discriminator'):
+        self.name = name
+        with scope(name):
+            self.lin = Linear(dim_btlnk, dim_x, name= 'lin')
+            self.nrm = Normalize(    dim_btlnk, name= 'nrm')
+            self.lex = Linear(dim_x, dim_btlnk, name= 'lex')
 
-    with tf.variable_scope("discriminator", reuse= tf.AUTO_REUSE):
+    def __call__(self, x, name= None):
+        with scope(name or self.name):
+            return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
 
-        dx = discriminator(x, btlnk_dim, data_dim)
-        dgx = discriminator(gx, btlnk_dim, data_dim)
 
-    with tf.variable_scope("loss"):
-        a = tf.reduce_mean(tf.abs(x - dx))
-        b = tf.reduce_mean(tf.abs(gx - dgx))
-        c =  tf.reduce_mean(tf.abs(x - gx))
-        d_loss = a - b
-        g_loss = b + c
-        loss = a - b - c
+class DAE(Record):
 
-    with tf.variable_scope("AUC"):
-        anomaly_score = tf.reduce_mean((x-dgx)**2, axis=1)
-        _, auc = tf.metrics.auc(y, anomaly_score)
+    @staticmethod
+    def new(dim_x, dim_btlnk):
+        return DAE(dim_x= dim_x
+                   , gen= Gen(dim_x, dim_btlnk)
+                   , dis= Dis(dim_x, dim_btlnk))
 
-    step = tf.train.get_or_create_global_step()
+    def build(self, x, y):
+        with tf.variable_scope("x"):
+            x = placeholder(tf.float32, [None, self.dim_x], x, "x")
+        with tf.variable_scope("y"):
+            y = placeholder(tf.float32, [None], y, "y")
 
-    with tf.variable_scope("optimizer"):
-        optimizer = tf.train.AdamOptimizer()
+        gx = self.gen(x)
+        dx, dgx = self.dis(x), self.dis(gx)
 
-    with tf.variable_scope("train_step"):
-        train_step = optimizer.apply_gradients(
+        with tf.variable_scope("loss"):
+            a = tf.reduce_mean(tf.abs(x - dx))
+            b = tf.reduce_mean(tf.abs(gx - dgx))
+            c =  tf.reduce_mean(tf.abs(x - gx))
+            d_loss = a - b
+            g_loss = b + c
+            loss = a - b - c
+
+        with tf.variable_scope("AUC"):
+            _, auc_dgx = tf.metrics.auc(y, tf.reduce_mean((x-dgx)**2, axis=1))
+            _, auc_gx = tf.metrics.auc(y, tf.reduce_mean((x-gx)**2, axis=1))
+
+        with scope('down'):
+            step = tf.train.get_or_create_global_step()
+            optimizer = tf.train.AdamOptimizer()
+            train_step = optimizer.apply_gradients(
             [((- grad if var.name.startswith("generator") else grad), var)
              for grad, var in optimizer.compute_gradients(loss)], step)
 
 
-
-    return dict(step=step,
-                x=x,
-                y=y,
-                gx=gx,
-                dgx=dgx,
-                dx=dx,
-                auc=auc,
-                train_step=train_step,
-                g_loss=g_loss,
-                d_loss=d_loss)
+        return DAE(self
+                   , step=step
+                   , x=x
+                   , y=y
+                   , gx=gx
+                   , dgx=dgx
+                   , dx=dx
+                   , auc_dgx=auc_dgx
+                   , auc_gx=auc_gx
+                   , train_step=train_step
+                   , g_loss=g_loss
+                   , d_loss=d_loss)

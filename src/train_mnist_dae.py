@@ -1,18 +1,16 @@
-try:
-    from src.util_tf import tf, pipe, batch2, placeholder, profile, spread_image
-    from src.util_io import pform
-    from src.util_np import np, unison_shfl
-    from src.models.dae import dae
-
-
-except ImportError:
-    from util_tf import tf, pipe, batch2, placeholder, profile, spread_image
-    from util_io import pform
-    from util_np import np, unison_shfl
-    from models.dae import dae
 from tqdm import tqdm
 from numpy.random import RandomState
 import os
+try:
+    from util_np import np, batch_sample
+    from util_tf import pipe, tf, spread_image, batch2
+    from util_io import pform
+    from models.dae import DAE
+except ImportError:
+    from src.util_np import np, batch_sample,unison_shfl
+    from src.util_tf import pipe, tf, spread_image, batch2
+    from src.util_io import pform
+    from src.models.dae import DAE
 
 def train(anomaly_class = 8):
     #set gpu
@@ -37,11 +35,11 @@ def train(anomaly_class = 8):
     path_ckpt = "/project/outlier_detection/ckpt"
 
     epochs = 400
-    batch_size = 700
-    btlnk_dim = 32
-    trial = f"kuandae{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}"
+    batch_size = 64
+    dim_btlnk = 32
+    trial = f"dae{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
 
-    data_dim = len(x_train[0])
+    dim_x = len(x_train[0])
 
     #fix seeds
     rand = RandomState(0)
@@ -49,11 +47,13 @@ def train(anomaly_class = 8):
 
     # data pipeline
     batch_fn = lambda: batch2(x_train, y_train, batch_size)
-    data = pipe(batch_fn, (tf.float32, tf.float32), prefetch=4)
+    x, y = pipe(batch_fn, (tf.float32, tf.float32), prefetch=4)
     #z = tf.random_normal((batch_size, z_dim))
 
     # load graph
-    model = dae(data, btlnk_dim, data_dim)
+    dae = DAE.new(dim_x, dim_btlnk)
+    model = DAE.build(dae, x, y)
+
 
     # start session, initialize variables
     sess = tf.InteractiveSession()
@@ -73,15 +73,16 @@ def train(anomaly_class = 8):
 
     def log(step
             , wrtr= wrtr
-            , log = tf.summary.merge([tf.summary.scalar('g_loss', model['g_loss'])
-                                      , tf.summary.scalar('d_loss', model['d_loss'])
-                                      , tf.summary.image('gx400', spread_image(model["gx"][:400], 20, 20, 28 ,28))
-                                      , tf.summary.image('dgx400', spread_image(model["dgx"][:400], 20, 20, 28 ,28))
-                                      , tf.summary.image('dx400', spread_image(model["dx"][:400], 20, 20, 28 ,28))
-                                      , tf.summary.scalar("AUC", model["auc"])])
+            , log = tf.summary.merge([tf.summary.scalar('g_loss', model.g_loss)
+                                      , tf.summary.scalar('d_loss', model.d_loss)
+                                      , tf.summary.image('gx400', spread_image(model.gx[:400], 20, 20, 28 ,28))
+                                      , tf.summary.image('dgx400', spread_image(model.dgx[:400], 20, 20, 28 ,28))
+                                      , tf.summary.image('dx400', spread_image(model.dx[:400], 20, 20, 28 ,28))
+                                      , tf.summary.scalar("AUC_dgx", model.auc_dgx)
+                                      , tf.summary.scalar("AUC_gx", model.auc_gx)])
             , y= y_test
             , x= x_test):
-        wrtr.add_summary(sess.run(log, {model["x"]:x, model["y"]:y}), step)
+        wrtr.add_summary(sess.run(log, {model.x:x, model.y:y}), step)
         wrtr.flush()
 
 
