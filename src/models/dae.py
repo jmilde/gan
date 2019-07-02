@@ -30,7 +30,7 @@ class Dis(Record):
 
     def __call__(self, x, name= None):
         with scope(name or self.name):
-            return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
+            return tf.clip_by_value(self.lex(self.nrm(tf.nn.leaky_relu(self.lin(x)))), 0.0, 1.0)
 
 
 class DAE(Record):

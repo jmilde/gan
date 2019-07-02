@@ -35,9 +35,9 @@ def train(anomaly_class = 8):
     path_ckpt = "/project/outlier_detection/ckpt"
 
     epochs = 400
-    batch_size = 64
+    batch_size = 700
     dim_btlnk = 32
-    trial = f"dae{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
+    trial = f"daeleaky{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
 
     dim_x = len(x_train[0])
 

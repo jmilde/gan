@@ -1,73 +1,90 @@
 try:
-    from util_tf import tf, placeholder,normalize
-    from util_np import np
+    from util import Record, identity, comp, partial
+    from util_tf import tf, scope, variable, placeholder, Linear, Affine, Normalize, spread_image
 except ImportError:
-    from src.util_tf import tf, placeholder,normalize
-    from src.util_np import np
+    from src.util import Record, identity, comp, partial
+    from src.util_tf import tf, scope, variable, placeholder, Linear, Affine, Normalize, spread_image
+
+class Gen(Record):
+
+    def __init__(self, dim_x, dim_btlnk, name= 'generator'):
+        self.name = name
+        with scope(name):
+            self.lin = Linear(dim_btlnk, dim_x, name= 'lin')
+            self.nrm = Normalize(    dim_btlnk, name= 'nrm')
+            self.lex = Linear(dim_x, dim_btlnk, name= 'lex')
+
+    def __call__(self, x, name= None):
+        with scope(name or self.name):
+            return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
 
 
-def gan(data, data_dim, dense_dim, btlnk_dim, w=1):
+class Dis(Record):
 
-    def generator(x, bltnk_dim, data_dim):
-        x = normalize(tf.nn.relu(tf.keras.layers.Dense(btlnk_dim, use_bias=False)(x)), "layer_norm_1")
-        x = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        #return tf.clip_by_value(x, 0.0, 1.0)
-        return tf.nn.sigmoid(x)
+    def __init__(self, dim_x, dim_dense, name= 'discriminator'):
+        self.name = name
+        with scope(name):
+            self.lin = Linear(dim_dense, dim_x, name= 'lin')
+            self.nrm = Normalize(    dim_dense, name= 'nrm')
+            self.lin2 = Linear(dim_dense, dim_dense, name= 'lin2')
+            self.nrm2 = Normalize(    dim_dense, name= 'nrm2')
+            self.lex = Linear(1, dim_dense, name= 'lex')
 
-    def discriminator(x, dense_dim, data_dim):
-        for i,d in enumerate(dense_dim):
-            with tf.variable_scope("dense_layer{}".format(i)):
-                x = normalize(tf.layers.dense(x, d, activation=tf.nn.leaky_relu, use_bias=False))
-        logits = tf.layers.dense(x, 1, use_bias=False)
-        return logits
-        #return tf.clip_by_value(x, 0.0, 1.0)
-
-
-
-    with tf.variable_scope("Input"):
-        x = placeholder(tf.float32, [None, data_dim], data[0], "Input")
-        y = placeholder(tf.float32, [None], data[1], "y")
-    with tf.variable_scope("generator"):
-        gx = generator(x, btlnk_dim, data_dim)
-
-    with tf.variable_scope("discriminator"):
-        dx = discriminator(x, dense_dim, data_dim)
-    with tf.variable_scope("discriminator",reuse=True):
-        dgx = discriminator(gx, dense_dim, data_dim)
-
-    step = tf.train.get_or_create_global_step()
-
-    with tf.variable_scope("loss"):
-        d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dx)*0.9, logits=dx))
-        d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgx), logits=dgx))
-        d_loss = d_loss_real + d_loss_fake
-        g_loss = w*tf.reduce_mean(tf.abs(x - gx))+  tf.reduce_mean(
-            tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgx), logits=dgx))
-
-    with tf.variable_scope("AUC"):
-        anomaly_score = tf.reduce_mean((x-gx)**2, axis=1)
-        _, auc = tf.metrics.auc(y, anomaly_score)
-        _, auc_d = tf.metrics.auc(y, tf.nn.sigmoid(dx))
-
-    g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
-    d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
-
-    with tf.variable_scope("Optimizer"):
-        optimizer = tf.train.AdamOptimizer()
-
-    with tf.variable_scope("train_step"):
-        d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
-        g_step = optimizer.minimize(g_loss, step, var_list=g_vars)
+    def __call__(self, x, name= None):
+        with scope(name or self.name):
+            x = self.nrm(tf.nn.leaky_relu(self.lin(x)))
+            x = self.nrm2(tf.nn.leaky_relu(self.lin2(x)))
+            return tf.clip_by_value(self.lex(x), 0.0, 1.0)
 
 
-    return dict(step=step
-                , x=x
-                , y=y
-                , auc=auc
-                , auc_d=auc_d
-                , d_loss=d_loss
-                , g_loss=g_loss
-                , gx=gx
-                #, train_step=train_step)
-                , d_step=d_step
-                , g_step=g_step)
+class AEGAN(Record):
+
+    @staticmethod
+    def new(dim_x, dim_btlnk, dim_dense):
+        return AEGAN(dim_x= dim_x
+                   , gen= Gen(dim_x, dim_btlnk)
+                   , dis= Dis(dim_x, dim_dense))
+
+    def build(self, x, y, weight):
+        with tf.variable_scope("x"):
+            x = placeholder(tf.float32, [None, self.dim_x], x, "x")
+        with tf.variable_scope("y"):
+            y = placeholder(tf.float32, [None], y, "y")
+
+        gx = self.gen(x)
+        dx, dgx = self.dis(x), self.dis(gx)
+
+        with tf.variable_scope("loss"):
+            d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dx)*0.9, logits=dx))
+            d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgx), logits=dgx))
+            d_loss = d_loss_real + d_loss_fake
+            g_loss = weight*tf.reduce_mean(tf.abs(x - gx))+  tf.reduce_mean(
+                tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgx), logits=dgx))
+
+        with tf.variable_scope("AUC"):
+            _, auc_dgx = tf.metrics.auc(y, tf.nn.sigmoid(dgx))
+            _, auc_dx = tf.metrics.auc(y, tf.nn.sigmoid(dx))
+            _, auc_gx = tf.metrics.auc(y, tf.reduce_mean((x-gx)**2, axis=1))
+
+        g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
+        d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
+
+        with scope('down'):
+            step = tf.train.get_or_create_global_step()
+            optimizer = tf.train.AdamOptimizer()
+            d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
+            g_step = optimizer.minimize(g_loss, step, var_list=g_vars)
+
+
+        return AEGAN(self
+                     , step=step
+                     , x=x
+                     , y=y
+                     , gx=gx
+                     , auc_dgx=auc_dgx
+                     , auc_gx=auc_gx
+                     , auc_dx=auc_dx
+                     , g_step=g_step
+                     , d_step=d_step
+                     , g_loss=g_loss
+                     , d_loss=d_loss)
