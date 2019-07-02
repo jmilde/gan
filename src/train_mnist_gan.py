@@ -74,10 +74,11 @@ def train(anomaly_class = 8):
             , log = tf.summary.merge([tf.summary.image('gz400', spread_image(model.gz[:400], 20,20,28,28))
                                       , tf.summary.scalar("AUC_d", model.auc_d)])
             , y= y_test
-            , x= x_test):
+            , x= x_test
+            , z= np.random.normal(size=(len(y_test), dim_z))):
         wrtr.add_summary(sess.run(log, {model.x:x
                                         , model.y:y
-                                        , model.z:np.random.normal(size=(len(y), dim_z))})
+                                        , model.z:z})
                          , step)
         wrtr.flush()
 
