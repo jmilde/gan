@@ -21,14 +21,14 @@ class Gen(Record):
 
 class Dis(Record):
 
-    def __init__(self, dim_x, dim_dense, name= 'discriminator'):
+    def __init__(self, dim_x, dim_d, name= 'discriminator'):
         self.name = name
         with scope(name):
-            self.lin = Linear(dim_dense, dim_x, name= 'lin')
-            self.nrm = Normalize(    dim_dense, name= 'nrm')
-            self.lin2 = Linear(dim_dense, dim_dense, name= 'lin2')
-            self.nrm2 = Normalize(    dim_dense, name= 'nrm2')
-            self.lex = Linear(1, dim_dense, name= 'lex')
+            self.lin = Linear(dim_d, dim_x, name= 'lin')
+            self.nrm = Normalize(    dim_d, name= 'nrm')
+            self.lin2 = Linear(dim_d, dim_d, name= 'lin2')
+            self.nrm2 = Normalize(    dim_d, name= 'nrm2')
+            self.lex = Linear(1, dim_d, name= 'lex')
 
     def __call__(self, x, name= None):
         with scope(name or self.name):
@@ -40,28 +40,28 @@ class Dis(Record):
 class AEGAN(Record):
 
     @staticmethod
-    def new(dim_x, dim_btlnk, dim_dense):
+    def new(dim_x, dim_btlnk, dim_d):
         return AEGAN(dim_x= dim_x
                    , gen= Gen(dim_x, dim_btlnk)
-                   , dis= Dis(dim_x, dim_dense))
+                   , dis= Dis(dim_x, dim_d))
 
     def build(self, x, y, weight):
-        with tf.variable_scope("x"):
+        with scope("x"):
             x = placeholder(tf.float32, [None, self.dim_x], x, "x")
-        with tf.variable_scope("y"):
+        with scope("y"):
             y = placeholder(tf.float32, [None], y, "y")
 
         gx = self.gen(x)
         dx, dgx = self.dis(x), self.dis(gx)
 
-        with tf.variable_scope("loss"):
+        with scope("loss"):
             d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dx)*0.9, logits=dx))
             d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgx), logits=dgx))
             d_loss = d_loss_real + d_loss_fake
             g_loss = weight*tf.reduce_mean(tf.abs(x - gx))+  tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgx), logits=dgx))
 
-        with tf.variable_scope("AUC"):
+        with scope("AUC"):
             _, auc_dgx = tf.metrics.auc(y, tf.nn.sigmoid(dgx))
             _, auc_dx = tf.metrics.auc(y, tf.nn.sigmoid(dx))
             _, auc_gx = tf.metrics.auc(y, tf.reduce_mean((x-gx)**2, axis=1))
@@ -69,7 +69,7 @@ class AEGAN(Record):
         g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
         d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
 
-        with scope('down'):
+        with scope('train_step'):
             step = tf.train.get_or_create_global_step()
             optimizer = tf.train.AdamOptimizer()
             d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
