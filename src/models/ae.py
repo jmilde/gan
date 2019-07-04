@@ -27,7 +27,7 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type):
         logits = decoder(z, data_dim)
 
     with tf.variable_scope("loss"):
-        if loss_type == "xntropy":
+        if loss_type == "xtrpy":
             loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=x, logits=logits))
         else:
             loss = tf.reduce_mean(tf.abs(x - logits))
@@ -45,6 +45,6 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type):
                 x=x,
                 y=y,
                 logits=logits,
-                auc_score=auc_score,
+                auc=auc,
                 train_step=train_step,
                 loss=loss)

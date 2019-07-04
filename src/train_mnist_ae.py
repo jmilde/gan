@@ -12,7 +12,7 @@ from tqdm import tqdm
 from numpy.random import RandomState
 import os
 
-def train(anomaly_class):
+def train(anomaly_class, loss_type):
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -31,18 +31,20 @@ def train(anomaly_class):
     path_ckpt = "/project/outlier_detection/ckpt"
 
 
-    epochs = 200
-    batch_size = 64
+    epochs = 400
+    batch_size = 700
 
     dense_dim = 64
     btlnk_dim = 32
     y_dim = 1
     data_dim = len(x_train[0])
-    loss_type = "l1 "#"xntropy"
-    trial = f"{anomaly_class}dae_b{batch_size}_d{dense_dim}_btlnk{btlnk_dim}_{loss_type}"
+
+    trial = f"ae{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}"
 
 
     rand = RandomState(0) #fix seed
+    tf.reset_default_graph()
+    if 'sess' in globals(): sess.close()
     # data pipeline
     batch_fn = lambda: batch2(x_train, y_train, batch_size)
     data = pipe(batch_fn, (tf.float32, tf.float32), prefetch=4)
@@ -52,6 +54,7 @@ def train(anomaly_class):
     model = ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type)
 
     # start session, initialize variables
+
     sess = tf.InteractiveSession()
     saver = tf.train.Saver()
 
@@ -82,16 +85,17 @@ def train(anomaly_class):
         wrtr.flush()
 
 
-
+    step_per_batch = len(x_train)//batch_size -1
     for epoch in tqdm(range(epochs)):
-        for i in range(len(x_train)//batch_size):
+        for i in range(step_per_batch):
             sess.run(model['train_step'])
         # tensorboard writer
-        log(sess.run(model["step"]))
+        log(sess.run(model["step"])//step_per_batch)
 
     saver.save(sess, pform(path_ckpt, trial), write_meta_graph=False)
 
 
 if __name__ == "__main__":
     for i in range(0,10):
-        train(i)
+        for l in ["l1 ", "xtrpy"]:
+            train(i,l)

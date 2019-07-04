@@ -42,7 +42,9 @@ def train(anomaly_class = 8):
 
     dim_x = len(x_train[0])
 
-     #fix seeds
+    #reset graphs and fix seeds
+    tf.reset_default_graph()
+    if 'sess' in globals(): sess.close()
     rand = RandomState(0)
     tf.set_random_seed(0)
 

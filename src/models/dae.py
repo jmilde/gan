@@ -17,7 +17,7 @@ class Gen(Record):
     def __call__(self, x, name= None):
         with scope(name or self.name):
             return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
-
+            #return tf.nn.sigmoid(self.lex(self.nrm(tf.nn.leaky_relu(self.lin(x)))))
 
 class Dis(Record):
 
@@ -31,6 +31,7 @@ class Dis(Record):
     def __call__(self, x, name= None):
         with scope(name or self.name):
             return tf.clip_by_value(self.lex(self.nrm(tf.nn.leaky_relu(self.lin(x)))), 0.0, 1.0)
+            #return tf.nn.sigmoid(self.lex(self.nrm(tf.nn.leaky_relu(self.lin(x)))))
 
 
 class DAE(Record):
@@ -60,6 +61,7 @@ class DAE(Record):
 
         with tf.variable_scope("AUC"):
             _, auc_dgx = tf.metrics.auc(y, tf.reduce_mean((x-dgx)**2, axis=1))
+            _, auc_dx = tf.metrics.auc(y, tf.reduce_mean((x-dx)**2, axis=1))
             _, auc_gx = tf.metrics.auc(y, tf.reduce_mean((x-gx)**2, axis=1))
 
         with scope('down'):
@@ -79,6 +81,7 @@ class DAE(Record):
                    , dx=dx
                    , auc_dgx=auc_dgx
                    , auc_gx=auc_gx
+                   , auc_dx=auc_dx
                    , train_step=train_step
                    , g_loss=g_loss
                    , d_loss=d_loss)

@@ -41,8 +41,12 @@ def train(anomaly_class = 8):
 
     data_dim = len(x_train[0])
 
+    #reset graphs and fix seeds
+    tf.reset_default_graph()
+    if 'sess' in globals(): sess.close()
+    rand = RandomState(0)
+    tf.set_random_seed(0)
 
-    rand = RandomState(0) #fix seed
     # data pipeline
     batch_fn = lambda: batch2(x_train, y_train, batch_size)
     data = pipe(batch_fn, (tf.float32, tf.float32), prefetch=4)

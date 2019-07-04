@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from numpy.random import RandomState
 import os
+import math
 try:
     from util_np import np, batch_sample
     from util_tf import pipe, tf, spread_image, batch2
@@ -11,6 +12,14 @@ except ImportError:
     from src.util_tf import pipe, tf, spread_image, batch2
     from src.util_io import pform
     from src.models.dae import DAE
+
+
+def sigmoid(x,shift=0,mult=15):
+    """
+    Using this sigmoid to discourage one network overpowering the other
+    """
+    return 1 / (1 + math.exp(-(x+shift)*mult))
+
 
 def train(anomaly_class = 8):
     #set gpu
@@ -37,11 +46,13 @@ def train(anomaly_class = 8):
     epochs = 400
     batch_size = 700
     dim_btlnk = 32
-    trial = f"daeleaky{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
+    trial = f"daebal{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
 
     dim_x = len(x_train[0])
 
-    #fix seeds
+    #reset graphs and fix seeds
+    tf.reset_default_graph()
+    if 'sess' in globals(): sess.close()
     rand = RandomState(0)
     tf.set_random_seed(0)
 
@@ -79,6 +90,7 @@ def train(anomaly_class = 8):
                                       , tf.summary.image('dgx400', spread_image(model.dgx[:400], 20, 20, 28 ,28))
                                       , tf.summary.image('dx400', spread_image(model.dx[:400], 20, 20, 28 ,28))
                                       , tf.summary.scalar("AUC_dgx", model.auc_dgx)
+                                      , tf.summary.scalar("AUC_dx", model.auc_dx)
                                       , tf.summary.scalar("AUC_gx", model.auc_gx)])
             , y= y_test
             , x= x_test):
@@ -87,9 +99,16 @@ def train(anomaly_class = 8):
 
 
     steps_per_epoch = len(x_train)//batch_size-1
+    lr_g = 1e-3
+    lr_d = 1e-3
+    bal= 0.5
     for epoch in tqdm(range(epochs)):
         for i in range(steps_per_epoch):
-            sess.run(model['train_step'])
+            d_loss, g_loss,_ = sess.run((model.d_loss, model.g_loss, model.train_step))
+            bal = sigmoid(g_loss+d_loss)
+            print(bal)
+            lr_g = lr_g * bal
+            lr_d = lr_d * (1-bal)
         # tensorboard writer
         log(sess.run(model["step"])//steps_per_epoch)
 

@@ -14,7 +14,7 @@ import os
 
 def train(anomaly_class = 8):
     #set gpu
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -41,7 +41,10 @@ def train(anomaly_class = 8):
 
     dim_x = len(x_train[0])
 
-    #fix seeds
+
+    #reset graphs and fix seeds
+    tf.reset_default_graph()
+    if 'sess' in globals(): sess.close()
     rand = RandomState(0)
     tf.set_random_seed(0)
 
@@ -93,5 +96,5 @@ def train(anomaly_class = 8):
 
 
 if __name__ == "__main__":
-    for i in range(8,9):
+    for i in range(0,10):
         train(i)
