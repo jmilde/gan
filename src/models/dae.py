@@ -64,13 +64,21 @@ class DAE(Record):
             _, auc_dx = tf.metrics.auc(y, tf.reduce_mean((x-dx)**2, axis=1))
             _, auc_gx = tf.metrics.auc(y, tf.reduce_mean((x-gx)**2, axis=1))
 
-        with scope('down'):
-            step = tf.train.get_or_create_global_step()
-            optimizer = tf.train.AdamOptimizer()
-            train_step = optimizer.apply_gradients(
-            [((- grad if var.name.startswith("generator") else grad), var)
-             for grad, var in optimizer.compute_gradients(loss)], step)
+        #with scope('down'):
+        #    step = tf.train.get_or_create_global_step()
+        #    optimizer = tf.train.AdamOptimizer()
+        #    train_step = optimizer.apply_gradients(
+        #    [((- grad if var.name.startswith("generator") else grad), var)
+        #     for grad, var in optimizer.compute_gradients(loss)], step)
 
+        with scope('down'):
+            g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
+            d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
+            lr = placeholder(tf.float32, [], name="lr")
+            step = tf.train.get_or_create_global_step()
+            optimizer = tf.train.AdamOptimizer(lr)
+            d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
+            g_step = optimizer.minimize(g_loss, step, var_list=g_vars)
 
         return DAE(self
                    , step=step
@@ -82,6 +90,10 @@ class DAE(Record):
                    , auc_dgx=auc_dgx
                    , auc_gx=auc_gx
                    , auc_dx=auc_dx
-                   , train_step=train_step
                    , g_loss=g_loss
-                   , d_loss=d_loss)
+                   , d_loss=d_loss
+                   , d_vs_g_loss=b
+                   , d_step=d_step
+                   , g_step=g_step
+                   , lr=lr)
+                   #, train_step=train_step)

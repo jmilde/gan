@@ -14,7 +14,7 @@ except ImportError:
     from src.models.dae import DAE
 
 
-def sigmoid(x,shift=0,mult=15):
+def sigmoid(x,shift=0,mult=5):
     """
     Using this sigmoid to discourage one network overpowering the other
     """
@@ -46,7 +46,7 @@ def train(anomaly_class = 8):
     epochs = 400
     batch_size = 700
     dim_btlnk = 32
-    trial = f"daebal{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
+    trial = f"daebal2{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
 
     dim_x = len(x_train[0])
 
@@ -98,17 +98,18 @@ def train(anomaly_class = 8):
         wrtr.flush()
 
 
-    steps_per_epoch = len(x_train)//batch_size-1
-    lr_g = 1e-3
-    lr_d = 1e-3
-    bal= 0.5
+    steps_per_epoch = (len(x_train)//batch_size)-1
+    lr_g, lr_d= 1e-3, 1e-3
+    new_lr_g, new_lr_d = lr_g, lr_d
     for epoch in tqdm(range(epochs)):
         for i in range(steps_per_epoch):
-            d_loss, g_loss,_ = sess.run((model.d_loss, model.g_loss, model.train_step))
-            bal = sigmoid(g_loss+d_loss)
-            print(bal)
-            lr_g = lr_g * bal
-            lr_d = lr_d * (1-bal)
+            #d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.train_step))
+            d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.d_step), {model.lr:new_lr_d})
+            # d_win if loss=0, g_win if loss=1
+            new_lr_g = lr_g *sigmoid(1-d_vs_g_loss)
+            d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.g_step), {model.lr:new_lr_g})
+            new_lr_d = lr_d * sigmoid(d_vs_g_loss)
+
         # tensorboard writer
         log(sess.run(model["step"])//steps_per_epoch)
 
