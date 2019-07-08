@@ -14,16 +14,24 @@ except ImportError:
     from src.models.dae import DAE
 
 
-def sigmoid(x,shift=0,mult=5):
+def sigmoid(x,shift=0,mult=1):
     """
     Using this sigmoid to discourage one network overpowering the other
     """
     return 1 / (1 + math.exp(-(x+shift)*mult))
 
+def plot_sigmoid():
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(nrows=1,ncols=1, figsize=(18,4))
+    plt.plot(np.arange(0,1,.01), [sigmoid(i/100.,0,1) for i in range(100)])
+    ax.set_xlabel('Mean of Discriminator(Real) or Discriminator(Fake)')
+    ax.set_ylabel('Multiplier for learning rate')
+    plt.title('Squashing the Learning Rate to balance Discrim/Gen network performance')
+    plt.show()
 
 def train(anomaly_class = 8):
     #set gpu
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -46,8 +54,10 @@ def train(anomaly_class = 8):
     epochs = 400
     batch_size = 700
     dim_btlnk = 32
-    trial = f"daebal2{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}"
-
+    mult=20
+    lr_max = 1e-4
+    trial = f"daebal{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_lr_{lr_max}m{mult}"
+    #trial="test1"
     dim_x = len(x_train[0])
 
     #reset graphs and fix seeds
@@ -63,7 +73,7 @@ def train(anomaly_class = 8):
 
     # load graph
     dae = DAE.new(dim_x, dim_btlnk)
-    model = DAE.build(dae, x, y)
+    model = DAE.build(dae, x, y, lr_max, mult)
 
 
     # start session, initialize variables
@@ -98,17 +108,11 @@ def train(anomaly_class = 8):
         wrtr.flush()
 
 
-    steps_per_epoch = (len(x_train)//batch_size)-1
-    lr_g, lr_d= 1e-3, 1e-3
-    new_lr_g, new_lr_d = lr_g, lr_d
+    steps_per_epoch = len(x_train)//batch_size
     for epoch in tqdm(range(epochs)):
         for i in range(steps_per_epoch):
-            #d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.train_step))
-            d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.d_step), {model.lr:new_lr_d})
-            # d_win if loss=0, g_win if loss=1
-            new_lr_g = lr_g *sigmoid(1-d_vs_g_loss)
-            d_vs_g_loss, _ = sess.run((model.d_vs_g_loss, model.g_step), {model.lr:new_lr_g})
-            new_lr_d = lr_d * sigmoid(d_vs_g_loss)
+            sess.run(model.d_step)
+            sess.run(model.g_step)
 
         # tensorboard writer
         log(sess.run(model["step"])//steps_per_epoch)
@@ -117,4 +121,5 @@ def train(anomaly_class = 8):
 
 
 if __name__ == "__main__":
-    train()
+    for i in range(0,10):
+        train(i)
