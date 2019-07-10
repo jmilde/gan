@@ -7,14 +7,10 @@ except ImportError:
 import math
 
 
-def NLLNormal(pred, target, epsilon=1e-6):
-    c = -0.5 * tf.log(2 * tf.constant(math.pi))
-    multiplier = 1.0 / (2.0 * 1)
-    tmp = tf.square(pred - target)
-    tmp *= -multiplier
-    tmp += c
-
-    return tmp * epsilon
+def NLLNormal(pred, target, scale=1e-6):
+    tmp = tf.square(pred - target) * -(1.0 / (2.0 * 1)) \
+        - 0.5 * tf.log(2 * tf.constant(math.pi))
+    return tmp * scale
 
 class Enc(Record):
 
@@ -51,7 +47,6 @@ class Dis(Record):
     def __init__(self, dim_x, dim_d, name= 'discriminator'):
         self.name = name
         with scope(name):
-            dim_d*=2
             self.lin = Linear(dim_d, dim_x, name= 'lin')
             self.nrm = Normalize(    dim_d, name= 'nrm')
             self.lin2 = Linear(dim_d, dim_d, name= 'lin2')
@@ -108,13 +103,14 @@ class VAEGAN(Record):
             d_loss = dx_loss + (dgzx_loss + dgz_loss)/2
 
             kl_loss = tf.reduce_mean(0.5 * (tf.square(mu) + tf.exp(lv) - lv - 1.0))
-            ftr_loss = tf.reduce_mean(tf.reduce_sum(NLLNormal(hl_dgzx, hl_dx)))
+            #ftr_loss = tf.reduce_mean(tf.reduce_sum(NLLNormal(hl_dgzx, hl_dx)))
+            ftr_loss =  tf.reduce_mean(tf.abs(x - gzx))*10
             e_loss = kl_loss*rate_anneal - ftr_loss
             gzx_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgzx) - g_scale_factor, logits=dgzx))
             gz_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgz) - g_scale_factor, logits=dgz))
-            g_loss = gz_loss + gzx_loss - ftr_loss*1e-1
+            g_loss = (gz_loss + gzx_loss)/2 - ftr_loss#*1e-1
 
         with scope("AUC"):
             _, auc_gzx = tf.metrics.auc(y, tf.reduce_mean((x-gzx)**2, axis=1))
@@ -138,6 +134,8 @@ class VAEGAN(Record):
                       , x=x
                       , y=y
                       , z=z
+                      , zx=zx
+                      , mu=mu
                       , gz=gz
                       , gzx=gzx
                       , auc_gzx=auc_gzx
