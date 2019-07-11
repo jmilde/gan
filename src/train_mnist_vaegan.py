@@ -39,9 +39,9 @@ def train(anomaly_class = 8):
     dim_btlnk = 32
     dim_z= dim_btlnk
     dim_dense = 32
-    accelerate = 1e-10
+    accelerate = 1
     context_weight = 1
-    trial = f"vaegan4{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
+    trial = f"vaegandx2-ftr{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
 
     dim_x = len(x_train[0])
     #reset graphs and fix seeds
@@ -108,7 +108,6 @@ def train(anomaly_class = 8):
     for epoch in tqdm(range(epochs)):
         for i in range(steps_per_epoch):
             sess.run(model.e_step)
-            sess.run(model.d_step)
             sess.run(model.g_step)
             sess.run(model.d_step)
 

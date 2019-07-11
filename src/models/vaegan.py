@@ -12,6 +12,16 @@ def NLLNormal(pred, target, scale=1e-6):
         - 0.5 * tf.log(2 * tf.constant(math.pi))
     return tmp * scale
 
+def GaussianLogDensity(x, mu, log_var, name='GaussianLogDensity'):
+    c = np.log(2 * np.pi)
+    var = tf.exp(log_var)
+    x_mu2 = tf.square(tf.sub(x, mu))   # [Issue] not sure the dim works or not?
+    x_mu2_over_var = tf.div(x_mu2, var + EPSILON)
+    log_prob = -0.5 * (c + log_var + x_mu2_over_var)
+    log_prob = tf.reduce_sum(log_prob, -1, name=name)   # keep_dims=True,
+    return log_prob
+
+
 class Enc(Record):
 
     def __init__(self, dim_x, dim_d, dim_btlnk, name= 'encoder'):
@@ -23,7 +33,7 @@ class Enc(Record):
             self.l_lv = Linear(dim_btlnk, dim_d, name= 'lv')
     def __call__(self, x, name= None):
         with scope(name or self.name):
-            hl = self.nrm(tf.nn.relu(self.lin(x)))
+            hl = self.nrm(tf.nn.elu(self.lin(x)))
             with tf.variable_scope('latent'):
                 mu = self.l_mu(hl)
                 lv = self.l_lv(hl)
@@ -40,13 +50,15 @@ class Gen(Record):
 
     def __call__(self, x, name=None):
         with scope(name or self.name):
-            return tf.clip_by_value(self.lex(x), 0.0, 1.0)
+            #return tf.clip_by_value(self.lex(x), 0.0, 1.0)
+            return tf.nn.sigmoid(self.lex(x))
 
 class Dis(Record):
 
     def __init__(self, dim_x, dim_d, name= 'discriminator'):
         self.name = name
         with scope(name):
+            dim_d *=2
             self.lin = Linear(dim_d, dim_x, name= 'lin')
             self.nrm = Normalize(    dim_d, name= 'nrm')
             self.lin2 = Linear(dim_d, dim_d, name= 'lin2')
@@ -56,9 +68,9 @@ class Dis(Record):
     def __call__(self, x, name= None):
         with scope(name or self.name):
             x = self.nrm(tf.nn.leaky_relu(self.lin(x)))
-            x = self.nrm2(tf.nn.leaky_relu(self.lin2(x)))
-            return tf.clip_by_value(self.lex(x), 0.0, 1.0), x
-
+            #x = self.nrm2(tf.nn.leaky_relu(self.lin2(x)))
+            #return tf.clip_by_value(self.lex(x), 0.0, 1.0), x
+            return self.lex(x), x
 
 class VAEGAN(Record):
 
@@ -104,13 +116,18 @@ class VAEGAN(Record):
 
             kl_loss = tf.reduce_mean(0.5 * (tf.square(mu) + tf.exp(lv) - lv - 1.0))
             #ftr_loss = tf.reduce_mean(tf.reduce_sum(NLLNormal(hl_dgzx, hl_dx)))
-            ftr_loss =  tf.reduce_mean(tf.abs(x - gzx))*10
-            e_loss = kl_loss*rate_anneal - ftr_loss
+            #ftr_loss =  tf.reduce_mean(tf.abs(x - gzx))*10
+            epsilon = 1e-10
+            ftr_loss = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+gzx) +
+                                                     (1-x) * tf.log(epsilon+1-gzx),  axis=1))
+
+            e_loss = kl_loss*rate_anneal + ftr_loss#*1e-1
+
             gzx_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgzx) - g_scale_factor, logits=dgzx))
             gz_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgz) - g_scale_factor, logits=dgz))
-            g_loss = (gz_loss + gzx_loss)/2 - ftr_loss#*1e-1
+            g_loss = (gz_loss + gzx_loss)/2 + ftr_loss
 
         with scope("AUC"):
             _, auc_gzx = tf.metrics.auc(y, tf.reduce_mean((x-gzx)**2, axis=1))
