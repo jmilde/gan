@@ -8,18 +8,20 @@ except ImportError:
 def VAE(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type, accelerate):
 
     def encoder(x, dim_btlnk, dim_x):
-        x = Normalize(dim_btlnk, "nrm")(tf.nn.relu(Linear(dim_btlnk, dim_x, name= 'lin')(x)))
+        #x = Normalize(dim_btlnk, "nrm")(tf.nn.elu(Linear(dim_btlnk, dim_x, name= 'lin')(x)))
         with tf.variable_scope('latent'):
-            mu = Linear(dim_btlnk, dim_btlnk, name= 'mu')(x)
-            lv = Linear(dim_btlnk, dim_btlnk, name= 'lv')(x)
-
+            #mu = Linear(dim_btlnk, dim_btlnk, name= 'mu')(x)
+            #lv = Linear(dim_btlnk, dim_btlnk, name= 'lv')(x)
+            lv = Linear(dim_btlnk, dim_x, name= 'lv')(x)
+            mu = Linear(dim_btlnk, dim_x, name= 'mu')(x)
         with tf.variable_scope('z'):
             z = mu + tf.exp(0.5 * lv) * tf.random_normal(shape=tf.shape(lv))
         return z, mu, lv
 
     def decoder(x, data_dim, btlnk_dim):
         x = Linear(data_dim, btlnk_dim)(x)
-        return tf.clip_by_value(x, 0.0, 1.0)
+        #return tf.clip_by_value(x, 0.0, 1.0)
+        return tf.nn.sigmoid(x)
 
     with tf.variable_scope("x"):
         x = placeholder(tf.float32, [None, data_dim], data[0], "x")
@@ -40,7 +42,10 @@ def VAE(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type, accelerate):
     with tf.variable_scope("loss"):
         kl_loss = tf.reduce_mean(0.5 * (tf.square(mu) + tf.exp(lv) - lv - 1.0))
         if loss_type == "xtrpy":
-            loss_rec = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=x, logits=logits))/1000
+            #loss_rec = tf.reduce_mean(tf.losses.softmax_cross_entropy(onehot_labels=x, logits=logits))
+            epsilon = 1e-10
+            loss_rec = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+logits) +
+                                                     (1-x) * tf.log(epsilon+1-logits),  axis=1))
         else:
             loss_rec = tf.reduce_mean(tf.abs(x - logits))
 

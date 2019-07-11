@@ -36,11 +36,11 @@ def train(anomaly_class, loss_type):
 
     dense_dim = 64
     btlnk_dim = 32
-    accelerate= 2e-5
+    accelerate= 1#1e-5
     y_dim = 1
     data_dim = len(x_train[0])
 
-    trial = f"vae6{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}_a{accelerate}"
+    trial = f"vae3a{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}_a{accelerate}"
 
 
     rand = RandomState(0) #fix seed
@@ -104,5 +104,5 @@ def train(anomaly_class, loss_type):
 
 if __name__ == "__main__":
     for i in range(0,1):
-        for l in ["l1 ", "xtrpy"]:
+        for l in ["l1", "xtrpy"]:
             train(i,l)
