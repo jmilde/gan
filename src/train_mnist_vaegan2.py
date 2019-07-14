@@ -5,17 +5,17 @@ try:
     from util_np import np, batch_sample
     from util_tf import pipe, tf, spread_image, batch2
     from util_io import pform
-    from models.vaegan import VAEGAN
+    from models.vaegan2 import VAEGAN
 except ImportError:
     from src.util_np import np, batch_sample,unison_shfl
     from src.util_tf import pipe, tf, spread_image, batch2
     from src.util_io import pform
-    from src.models.vaegan import VAEGAN
+    from src.models.vaegan2 import VAEGAN
 
 
-def train(anomaly_class = 8):
+def train(anomaly_class = 8, loss_type):
     #set gpu
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -41,7 +41,7 @@ def train(anomaly_class = 8):
     dim_dense = 32
     accelerate = 1e-5
     context_weight = 1
-    trial = f"vaegan{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
+    trial = f"vaegan_{loss_type}_{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
 
     dim_x = len(x_train[0])
     #reset graphs and fix seeds
@@ -55,7 +55,7 @@ def train(anomaly_class = 8):
     x, y, z = pipe(batch_fn, (tf.float32, tf.float32, tf.float32), prefetch=4)
 
     # load graph
-    aegan = VAEGAN.new(dim_x, dim_btlnk, dim_dense, dim_z, accelerate)
+    aegan = VAEGAN.new(dim_x, dim_btlnk, dim_dense, dim_z, accelerate, loss_type)
     model = VAEGAN.build(aegan, x, y, z)
 
 
@@ -79,7 +79,8 @@ def train(anomaly_class = 8):
             , wrtr= wrtr
             , log = tf.summary.merge([tf.summary.scalar('g_loss', model.g_loss)
                                       , tf.summary.scalar('d_loss', model.d_loss)
-                                      , tf.summary.scalar('e_loss', model.e_loss)
+                                      , tf.summary.scalar('mu', model.m)
+                                      , tf.summary.scalar('lv', model.l)
                                       , tf.summary.image('gzx400', spread_image(model.gzx[:400], 20,20,28,28))
                                       #, tf.summary.image('gz400', spread_image(model.gz[:400], 20,20,28,28))
                                       , tf.summary.scalar("AUC_gzx", model.auc_gzx)
@@ -93,13 +94,11 @@ def train(anomaly_class = 8):
                                       #, tf.summary.scalar("dgz_loss",model.dgz_loss)
                                       , tf.summary.scalar("dgzx_loss",model.dgzx_loss)])
             , y= y_test
-            , x= x_test
-            , z= np.random.normal(size=(len(y_test), dim_z))):
+            , x= x_test):
         mu = sess.run(model.mu, {model.x:x})
         wrtr.add_summary(sess.run(log, {model.zx:mu
                                         , model.x:x
-                                        , model.y:y
-                                        , model.z:z} )
+                                        , model.y:y} )
                          , step)
         wrtr.flush()
 
@@ -107,7 +106,6 @@ def train(anomaly_class = 8):
     steps_per_epoch = len(x_train)//batch_size
     for epoch in tqdm(range(epochs)):
         for i in range(steps_per_epoch):
-            sess.run(model.e_step)
             sess.run(model.g_step)
             sess.run(model.d_step)
 
@@ -121,4 +119,5 @@ def train(anomaly_class = 8):
 
 if __name__ == "__main__":
     for i in range(0,1):
-        train(i)
+        for j in ["xtrpy", "l1"]:
+            train(i, j)
