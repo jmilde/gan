@@ -13,7 +13,7 @@ from numpy.random import RandomState
 import os
 
 def train(anomaly_class, loss_type):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     #load data
     (train_images, train_labels),(test_images, test_labels) = tf.keras.datasets.mnist.load_data()
     inlier = train_images[train_labels!=anomaly_class]
@@ -39,7 +39,7 @@ def train(anomaly_class, loss_type):
     y_dim = 1
     data_dim = len(x_train[0])
 
-    trial = f"ae{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}"
+    trial = f"ae_{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}"
 
 
     rand = RandomState(0) #fix seed
@@ -85,7 +85,7 @@ def train(anomaly_class, loss_type):
         wrtr.flush()
 
 
-    step_per_batch = len(x_train)//batch_size -1
+    step_per_batch = len(x_train)//batch_size
     for epoch in tqdm(range(epochs)):
         for i in range(step_per_batch):
             sess.run(model['train_step'])
@@ -97,5 +97,5 @@ def train(anomaly_class, loss_type):
 
 if __name__ == "__main__":
     for i in range(0,10):
-        for l in ["l1 ", "xtrpy"]:
+        for l in ["xtrpy"]:
             train(i,l)

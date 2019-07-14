@@ -8,12 +8,12 @@ except ImportError:
 def VAE(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type, accelerate):
 
     def encoder(x, dim_btlnk, dim_x):
-        #x = Normalize(dim_btlnk, "nrm")(tf.nn.elu(Linear(dim_btlnk, dim_x, name= 'lin')(x)))
+        x = Normalize(dim_btlnk, "nrm")(tf.nn.elu(Linear(dim_btlnk, dim_x, name= 'lin')(x)))
         with tf.variable_scope('latent'):
-            #mu = Linear(dim_btlnk, dim_btlnk, name= 'mu')(x)
-            #lv = Linear(dim_btlnk, dim_btlnk, name= 'lv')(x)
-            lv = Linear(dim_btlnk, dim_x, name= 'lv')(x)
-            mu = Linear(dim_btlnk, dim_x, name= 'mu')(x)
+            mu = Linear(dim_btlnk, dim_btlnk, name= 'mu')(x)
+            lv = Linear(dim_btlnk, dim_btlnk, name= 'lv')(x)
+            #lv = Linear(dim_btlnk, dim_x, name= 'lv')(x)
+            #mu = Linear(dim_btlnk, dim_x, name= 'mu')(x)
         with tf.variable_scope('z'):
             z = mu + tf.exp(0.5 * lv) * tf.random_normal(shape=tf.shape(lv))
         return z, mu, lv

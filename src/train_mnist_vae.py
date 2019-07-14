@@ -36,11 +36,11 @@ def train(anomaly_class, loss_type):
 
     dense_dim = 64
     btlnk_dim = 32
-    accelerate= 1#1e-5
+    accelerate= 1e-5 # delay kl loss
     y_dim = 1
     data_dim = len(x_train[0])
 
-    trial = f"vae3a{loss_type}_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}_a{accelerate}"
+    trial = f"vae_{anomaly_class}_b{batch_size}_btlnk{btlnk_dim}_a{accelerate}"
 
 
     rand = RandomState(0) #fix seed
@@ -97,12 +97,12 @@ def train(anomaly_class, loss_type):
         for i in range(step_per_batch):
             sess.run(model['train_step'])
         # tensorboard writer
-        log(sess.run(model["step"]))
+        log(sess.run(model["step"]//step_per_batch))
 
     saver.save(sess, pform(path_ckpt, trial), write_meta_graph=False)
 
 
 if __name__ == "__main__":
-    for i in range(0,1):
-        for l in ["l1", "xtrpy"]:
+    for i in range(0,10):
+        for l in ["xtrpy"]:
             train(i,l)

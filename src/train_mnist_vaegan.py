@@ -39,9 +39,9 @@ def train(anomaly_class = 8):
     dim_btlnk = 32
     dim_z= dim_btlnk
     dim_dense = 32
-    accelerate = 1
+    accelerate = 1e-5
     context_weight = 1
-    trial = f"vaegandx2-ftr{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
+    trial = f"vaegan{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_d{dim_dense}_n{dim_z}_a{accelerate}"
 
     dim_x = len(x_train[0])
     #reset graphs and fix seeds
@@ -81,16 +81,16 @@ def train(anomaly_class = 8):
                                       , tf.summary.scalar('d_loss', model.d_loss)
                                       , tf.summary.scalar('e_loss', model.e_loss)
                                       , tf.summary.image('gzx400', spread_image(model.gzx[:400], 20,20,28,28))
-                                      , tf.summary.image('gz400', spread_image(model.gz[:400], 20,20,28,28))
+                                      #, tf.summary.image('gz400', spread_image(model.gz[:400], 20,20,28,28))
                                       , tf.summary.scalar("AUC_gzx", model.auc_gzx)
                                       , tf.summary.scalar("AUC_dgzx", model.auc_dgzx)
                                       , tf.summary.scalar("AUC_dx", model.auc_dx)
-                                      , tf.summary.scalar("gz_loss",model.gz_loss)
+                                      #, tf.summary.scalar("gz_loss",model.gz_loss)
                                       , tf.summary.scalar("gzx_loss",model.gzx_loss)
                                       , tf.summary.scalar("ftr_loss",model.ftr_loss)
                                       , tf.summary.scalar("kl_loss",model.kl_loss)
                                       , tf.summary.scalar("dx_loss",model.dx_loss)
-                                      , tf.summary.scalar("dgz_loss",model.dgz_loss)
+                                      #, tf.summary.scalar("dgz_loss",model.dgz_loss)
                                       , tf.summary.scalar("dgzx_loss",model.dgzx_loss)])
             , y= y_test
             , x= x_test
@@ -114,11 +114,11 @@ def train(anomaly_class = 8):
 
         # tensorboard writer
         #log(sess.run(model["step"])//steps_per_epoch)
-        log(sess.run(model["step"]))
+        log(sess.run(model["step"]//steps_per_epoch))
 
     saver.save(sess, pform(path_ckpt, trial), write_meta_graph=False)
 
 
 if __name__ == "__main__":
-    #for i in range(0,10):
-    train()
+    for i in range(0,10):
+        train(i)

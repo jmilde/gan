@@ -13,7 +13,8 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type):
 
     def decoder(x, data_dim):
         x = tf.keras.layers.Dense(data_dim, use_bias=False)(x)
-        return tf.clip_by_value(x, 0.0, 1.0)
+        #return tf.clip_by_value(x, 0.0, 1.0)
+        return tf.sigmoid(x)
 
     with tf.variable_scope("x"):
         x = placeholder(tf.float32, [None, data_dim], data[0], "x")
@@ -28,7 +29,10 @@ def ae(data, btlnk_dim, data_dim, dense_dim, y_dim, loss_type):
 
     with tf.variable_scope("loss"):
         if loss_type == "xtrpy":
-            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=x, logits=logits))
+            #loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=x, logits=logits))
+            epsilon = 1e-10
+            loss = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+logits) +
+                                                     (1-x) * tf.log(epsilon+1-logits),  axis=1))
         else:
             loss = tf.reduce_mean(tf.abs(x - logits))
     step = tf.train.get_or_create_global_step()

@@ -16,8 +16,8 @@ class Gen(Record):
 
     def __call__(self, x, name= None):
         with scope(name or self.name):
-            return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
-
+            #return tf.clip_by_value(self.lex(self.nrm(tf.nn.relu(self.lin(x)))), 0.0, 1.0)
+            return tf.nn.sigmoid(self.lex(self.nrm(tf.nn.relu(self.lin(x)))))
 
 class Dis(Record):
 
@@ -58,8 +58,13 @@ class AEGAN(Record):
             d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dx)*0.9, logits=dx))
             d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgx), logits=dgx))
             d_loss = d_loss_real + d_loss_fake
-            g_loss = weight*tf.reduce_mean(tf.abs(x - gx))+  tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgx), logits=dgx))
+
+            epsilon = 1e-10
+            loss_rec = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+gx) +
+                                                     (1-x) * tf.log(epsilon+1-gx),  axis=1))
+            g_loss = weight* loss_rec \
+                +  tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgx), logits=dgx))
 
         with scope("AUC"):
             _, auc_dgx = tf.metrics.auc(y, tf.nn.sigmoid(dgx))

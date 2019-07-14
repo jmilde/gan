@@ -56,7 +56,7 @@ def train(anomaly_class = 8):
     dim_btlnk = 32
     mult=20
     lr_max = 1e-4
-    trial = f"daebal{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_lr_{lr_max}m{mult}"
+    trial = f"dae{anomaly_class}_b{batch_size}_btlnk{dim_btlnk}_lr_{lr_max}m{mult}"
     #trial="test1"
     dim_x = len(x_train[0])
 

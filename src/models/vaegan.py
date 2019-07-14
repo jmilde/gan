@@ -12,15 +12,6 @@ def NLLNormal(pred, target, scale=1e-6):
         - 0.5 * tf.log(2 * tf.constant(math.pi))
     return tmp * scale
 
-def GaussianLogDensity(x, mu, log_var, name='GaussianLogDensity'):
-    c = np.log(2 * np.pi)
-    var = tf.exp(log_var)
-    x_mu2 = tf.square(tf.sub(x, mu))   # [Issue] not sure the dim works or not?
-    x_mu2_over_var = tf.div(x_mu2, var + EPSILON)
-    log_prob = -0.5 * (c + log_var + x_mu2_over_var)
-    log_prob = tf.reduce_sum(log_prob, -1, name=name)   # keep_dims=True,
-    return log_prob
-
 
 class Enc(Record):
 
@@ -97,11 +88,11 @@ class VAEGAN(Record):
         zx, mu, lv, hl_e = self.enc(x)
 
         gzx = self.gen(zx)
-        gz = self.gen(z)
+        #gz = self.gen(z)
 
         dx, hl_dx = self.dis(x)
         dgzx, hl_dgzx = self.dis(gzx)
-        dgz, hl_dgz = self.dis(gz)
+        #dgz, hl_dgz = self.dis(gz)
 
         with tf.variable_scope("step"):
             step = tf.train.get_or_create_global_step()
@@ -111,8 +102,8 @@ class VAEGAN(Record):
         with scope("loss"):
             dx_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dx)-d_scale_factor, logits=dx))
             dgzx_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgzx), logits=dgzx))
-            dgz_loss =  tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgz), logits=dgz))
-            d_loss = dx_loss + (dgzx_loss + dgz_loss)/2
+            #dgz_loss =  tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(dgz), logits=dgz))
+            d_loss = dx_loss + dgzx_loss #+ dgz_loss
 
             kl_loss = tf.reduce_mean(0.5 * (tf.square(mu) + tf.exp(lv) - lv - 1.0))
             #ftr_loss = tf.reduce_mean(tf.reduce_sum(NLLNormal(hl_dgzx, hl_dx)))
@@ -121,13 +112,14 @@ class VAEGAN(Record):
             ftr_loss = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+gzx) +
                                                      (1-x) * tf.log(epsilon+1-gzx),  axis=1))
 
-            e_loss = kl_loss*rate_anneal + ftr_loss#*1e-1
+            e_loss = kl_loss*rate_anneal + ftr_loss/10
 
             gzx_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgzx) - g_scale_factor, logits=dgzx))
-            gz_loss = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgz) - g_scale_factor, logits=dgz))
-            g_loss = (gz_loss + gzx_loss)/2 + ftr_loss
+            #gz_loss = tf.reduce_mean(
+            #    tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgz) - g_scale_factor, logits=dgz))
+            #g_loss = gz_loss + gzx_loss + ftr_loss
+            g_loss = gzx_loss + ftr_loss
 
         with scope("AUC"):
             _, auc_gzx = tf.metrics.auc(y, tf.reduce_mean((x-gzx)**2, axis=1))
@@ -140,6 +132,7 @@ class VAEGAN(Record):
 
 
         with scope('train_step'):
+            #optimizer = tf.train.RMSPropOptimizer()
             optimizer = tf.train.AdamOptimizer()
             d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
             g_step = optimizer.minimize(g_loss, step, var_list=g_vars)
@@ -153,7 +146,7 @@ class VAEGAN(Record):
                       , z=z
                       , zx=zx
                       , mu=mu
-                      , gz=gz
+                      #, gz=gz
                       , gzx=gzx
                       , auc_gzx=auc_gzx
                       , auc_dx=auc_dx
@@ -164,10 +157,10 @@ class VAEGAN(Record):
                       , g_loss=g_loss
                       , d_loss=d_loss
                       , e_loss=e_loss
-                      ,gz_loss=gz_loss
+                      #,gz_loss=gz_loss
                       ,gzx_loss=gzx_loss
                       , ftr_loss=ftr_loss
                       ,kl_loss=kl_loss
                       , dx_loss=dx_loss
-                      , dgz_loss=dgz_loss
+                      #, dgz_loss=dgz_loss
                       , dgzx_loss=dgzx_loss)
