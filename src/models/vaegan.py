@@ -25,12 +25,9 @@ class Enc(Record):
     def __call__(self, x, name= None):
         with scope(name or self.name):
             hl = self.nrm(tf.nn.elu(self.lin(x)))
-            with tf.variable_scope('latent'):
-                mu = self.l_mu(hl)
-                lv = self.l_lv(hl)
-
-            with tf.variable_scope('z'):
-                z = mu + tf.exp(0.5 * lv) * tf.random_normal(shape=tf.shape(lv))
+            mu = self.l_mu(hl)
+            lv = self.l_lv(hl)
+            z = mu + tf.exp(0.5 * lv) * tf.random_normal(shape=tf.shape(lv))
             return z, mu, lv, hl
 
 class Gen(Record):
@@ -75,7 +72,7 @@ class VAEGAN(Record):
                       , dis= Dis(dim_x, dim_d)
                       , accelerate=accelerate)
 
-    def build(self, x, y, z):
+    def build(self, x, y, z, loss_type):
         d_scale_factor = tf.constant(0.)#tf.constant(0.25)
         g_scale_factor = tf.constant(0.)#tf.constant(1 - 0.75/2)
         with scope("x"):
@@ -106,20 +103,19 @@ class VAEGAN(Record):
             d_loss = dx_loss + dgzx_loss #+ dgz_loss
 
             kl_loss = tf.reduce_mean(0.5 * (tf.square(mu) + tf.exp(lv) - lv - 1.0))
-            #ftr_loss = tf.reduce_mean(tf.reduce_sum(NLLNormal(hl_dgzx, hl_dx)))
-            #ftr_loss =  tf.reduce_mean(tf.abs(x - gzx))*10
-            epsilon = 1e-10
-            ftr_loss = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+gzx) +
-                                                     (1-x) * tf.log(epsilon+1-gzx),  axis=1))
-
-            e_loss = kl_loss*rate_anneal + ftr_loss/10
 
             gzx_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgzx) - g_scale_factor, logits=dgzx))
-            #gz_loss = tf.reduce_mean(
-            #    tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(dgz) - g_scale_factor, logits=dgz))
-            #g_loss = gz_loss + gzx_loss + ftr_loss
-            g_loss = gzx_loss + ftr_loss
+
+            if loss_type=="xtrpy":
+                epsilon = 1e-10
+                ftr_loss = tf.reduce_mean(-tf.reduce_sum(x * tf.log(epsilon+gzx) +
+                                                         (1-x) * tf.log(epsilon+1-gzx),  axis=1))
+                g_loss = gzx_loss/10 + ftr_loss/5 + kl_loss*rate_anneal
+
+            else:
+                ftr_loss = tf.reduce_mean(tf.abs(x-gzx))
+                g_loss = gzx_loss/2 + ftr_loss*10 + kl_loss*rate_anneal
 
         with scope("AUC"):
             _, auc_gzx = tf.metrics.auc(y, tf.reduce_mean((x-gzx)**2, axis=1))
@@ -127,16 +123,16 @@ class VAEGAN(Record):
             _, auc_dgzx = tf.metrics.auc(y, tf.nn.sigmoid(dgzx))
 
         g_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="generator")
+        g_vars.append(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="encoder"))
+        print(g_vars)
         d_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator")
-        e_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="encoder")
-
+        print(d_vars)
 
         with scope('train_step'):
             #optimizer = tf.train.RMSPropOptimizer()
             optimizer = tf.train.AdamOptimizer()
             d_step = optimizer.minimize(d_loss, step, var_list=d_vars)
             g_step = optimizer.minimize(g_loss, step, var_list=g_vars)
-            e_step = optimizer.minimize(e_loss, step, var_list=e_vars)
 
 
         return VAEGAN(self
@@ -146,6 +142,9 @@ class VAEGAN(Record):
                       , z=z
                       , zx=zx
                       , mu=mu
+                      , lv=lv
+                      , m=tf.reduce_mean(mu)
+                      , l=tf.reduce_mean(lv)
                       #, gz=gz
                       , gzx=gzx
                       , auc_gzx=auc_gzx
@@ -153,10 +152,8 @@ class VAEGAN(Record):
                       , auc_dgzx=auc_dgzx
                       , g_step=g_step
                       , d_step=d_step
-                      , e_step=e_step
                       , g_loss=g_loss
                       , d_loss=d_loss
-                      , e_loss=e_loss
                       #,gz_loss=gz_loss
                       ,gzx_loss=gzx_loss
                       , ftr_loss=ftr_loss
